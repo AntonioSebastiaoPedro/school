@@ -23,7 +23,7 @@ function schoolApplication(array $overrides = []): array
 }
 
 it('aceita pedidos públicos de adesão sem conceder acesso operacional', function () {
-    $this->postJson('/api/v1/institution-applications', schoolApplication())->assertCreated();
+    $this->postJson('/api/v1/institution-applications', schoolApplication())->assertCreated()->assertJsonPath('data.status', 'pending');
 
     expect(InstitutionApplication::count())->toBe(1)
         ->and(Institution::count())->toBe(0)

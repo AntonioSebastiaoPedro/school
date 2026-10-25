@@ -1446,6 +1446,7 @@ components:
                   current_page: { type: integer }
                   last_page: { type: integer }
                   per_page: { type: integer }
+                  total: { type: integer }
     PaginatedStudents:
       description: Lista paginada de alunos
       content:
@@ -1460,3 +1461,4 @@ components:
                   current_page: { type: integer }
                   last_page: { type: integer }
                   per_page: { type: integer }
+                  total: { type: integer }

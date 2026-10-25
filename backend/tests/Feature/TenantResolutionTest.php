@@ -86,11 +86,11 @@ it('inicia e termina sessão e lista as instituições do utilizador', function 
     $user = User::factory()->create(['email' => 'dir@escola.ao', 'password' => 'segredo123']);
     DB::table('institution_user')->insert(['institution_id' => $school->id, 'user_id' => $user->id, 'role' => 'director', 'status' => 'active']);
 
-    $this->withHeader('Origin', 'http://localhost:5173')
+    $this->withHeader('Origin', config('app.frontend_url'))
         ->postJson('/api/v1/auth/login', ['email' => 'dir@escola.ao', 'password' => 'errada'])
         ->assertUnprocessable();
 
-    $this->withHeader('Origin', 'http://localhost:5173')
+    $this->withHeader('Origin', config('app.frontend_url'))
         ->postJson('/api/v1/auth/login', ['email' => 'dir@escola.ao', 'password' => 'segredo123'])
         ->assertNoContent();
 

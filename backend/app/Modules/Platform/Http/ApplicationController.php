@@ -35,7 +35,7 @@ class ApplicationController extends Controller
             'school_profile.municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
         ]);
 
-        $application = InstitutionApplication::create($data);
+        $application = InstitutionApplication::create($data)->refresh();
 
         return response()->json(['data' => ['id' => $application->id, 'status' => $application->status]], 201);
     }

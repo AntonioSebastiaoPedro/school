@@ -11,6 +11,8 @@ const grid = {
   rows: [{ enrollment_id: 3, roll_number: 1, student_name: 'Ana Silva', mac: null, npp: null, npt: null, mt: null, exam: null, resit: null }],
 }
 
+const levels = { data: [{ id: 4, grade_number: 4, name: '4.ª Classe', stage: 'primary', min_age: 9, max_age: 10, max_score: 10, pass_mark: 5, has_national_exam: false, assessment_regime: 'lenient' }] }
+
 function stubApi(onPut: (body: unknown) => void) {
   vi.stubGlobal(
     'fetch',
@@ -19,7 +21,8 @@ function stubApi(onPut: (body: unknown) => void) {
       if (init?.method === 'PUT') {
         onPut(JSON.parse(String(init.body)))
         body = { saved: 1 }
-      } else if (url.includes('/sections')) body = sections
+      } else if (url.includes('/grade-levels')) body = levels
+      else if (url.includes('/sections')) body = sections
       else if (url.includes('/curriculum')) body = curriculum
       else if (url.includes('/grades')) body = grid
       return { status: 200, ok: true, json: async () => body }

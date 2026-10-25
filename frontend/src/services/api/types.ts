@@ -28,6 +28,8 @@ export interface GradeLevel {
   grade_number: number
   name: string
   stage: 'preschool' | 'primary' | 'lower_secondary'
+  min_age: number
+  max_age: number
   max_score: number | null
   pass_mark: number | null
   has_national_exam: boolean
@@ -105,3 +107,33 @@ export interface GradeSheet {
 }
 
 export const SHIFTS: Record<Section['shift'], string> = { morning: 'Manhã', afternoon: 'Tarde', night: 'Noite' }
+
+export interface Paginated<T> {
+  data: T[]
+  meta: { current_page: number; last_page: number; per_page: number; total: number }
+}
+
+export interface Application {
+  id: number
+  institution_type: 'school' | 'training_center' | 'both'
+  proposed_name: string
+  applicant_name: string
+  applicant_email: string
+  applicant_phone: string | null
+  tax_identifier: string | null
+  province: string | null
+  municipality: string | null
+  status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'info_requested'
+  review_notes: string | null
+  submitted_at: string
+  reviewed_at: string | null
+  school_profile: { director_name?: string; regime?: string; school_code?: string } | null
+}
+
+export const INSTITUTION_TYPES: Record<Application['institution_type'], string> = {
+  school: 'Escola',
+  training_center: 'Centro de formação',
+  both: 'Escola e centro de formação',
+}
+
+export const REGIMES: Record<string, string> = { public: 'Público', private: 'Privado', mixed: 'Misto' }

@@ -28,7 +28,7 @@ class EnrollmentController extends Controller
 
         return response()->json([
             'data' => $page->items(),
-            'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'per_page' => $page->perPage()],
+            'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'per_page' => $page->perPage(), 'total' => $page->total()],
         ]);
     }
 

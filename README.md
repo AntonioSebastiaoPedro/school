@@ -14,27 +14,41 @@ Implementado: fundação, identidade e tenant (sessão Sanctum, `X-Institution-I
 
 Fora desta entrega: financeiro, portal dos encarregados, certificados de formação, PDF dos documentos oficiais (declaração, certificado, termo, atestado, pauta A3), piloto. Os municípios de Angola não vêm carregados: preencher `backend/database/seeders/data/municipalities.csv` com a divisão oficial (colunas `province,municipality`).
 
-## Arranque local
+## Makefile
+
+`make help` lista tudo. Os essenciais:
+
+| Comando | O que faz |
+|---|---|
+| `make setup` | Primeira instalação: `.env`, contentores, dependências, migrations e dados de demonstração |
+| `make up` / `make down` | Arranca / para o desenvolvimento (API, Postgres, Vite) |
+| `make test` | Pest (sempre na base `school_test`) + Vitest + tipos |
+| `make lint` / `make format` | Pint, tipos, schema e OpenAPI |
+| `make artisan cmd="..."` / `make composer cmd="..."` / `make npm cmd="..."` | Comandos dentro dos contentores |
+| `make psql` / `make shell` / `make logs` | Base de dados, shell e registos |
+| `make migrations` | Regenera as migrations a partir do `schema.sql` |
+| `make deploy` | Cópia de segurança, build, migrations, catálogos e `optimize` (produção) |
+| `make backup` / `make restore file=...` | Cópia e restauro da base de produção |
+
+## Desenvolvimento
 
 ```bash
-docker compose up -d db                       # PostgreSQL em localhost:55432 (bases school e school_test)
-cd backend
-./php.sh composer install                     # PHP 8.4 com pdo_pgsql, dentro do contentor
-./php.sh php artisan migrate:fresh --seed --seeder=DemoSeeder
-docker compose up php                         # API em http://localhost:8000
-cd ../frontend && npm install && npm run dev  # http://localhost:5173 (proxy para a API)
+make setup      # API em http://localhost:8000 · frontend em http://localhost:5180
 ```
 
-Utilizadores de demonstração (só desenvolvimento): `director@demo.ao` e `admin@demo.ao`, palavra-passe `password`.
+Utilizadores de demonstração (só desenvolvimento): `director@demo.ao` e `admin@demo.ao`, palavra-passe `password`. As portas e o resto da configuração estão em `.env` (modelo em `.env.example`).
+
+## Produção
+
+`compose.yml` (base) + `compose.prod.yml`: `app` (php-fpm), `nginx` (frontend compilado + proxy da API) e `postgres`. O nginx só escuta em `127.0.0.1:HTTP_PORT`: ponha à frente um proxy com TLS (Caddy, nginx). No servidor: copie `.env.example` para `.env` e ajuste (`APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY`, `DB_PASSWORD`, `APP_URL`, `FRONTEND_URL` e `SANCTUM_STATEFUL_DOMAINS` com o domínio, `SESSION_SECURE_COOKIE=true`), depois `make deploy`. Os comandos `artisan` de produção correm como `www-data` (`make prod-artisan cmd=...`).
 
 ## Testes
 
 ```bash
-cd backend && ./php.sh vendor/bin/pest        # corre sempre na base school_test
-cd frontend && npm test
+make test
 ```
 
-Os testes de feature recusam correr numa base cujo nome não termine em `_test`.
+Os testes de feature recusam correr fora de `APP_ENV=testing` ou numa base cujo nome não termine em `_test`.
 
 ## Decisões de regra a validar com o Ministério da Educação
 

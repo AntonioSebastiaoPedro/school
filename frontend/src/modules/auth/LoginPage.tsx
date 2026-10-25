@@ -23,16 +23,22 @@ export function LoginPage() {
   }
 
   return (
-    <main className="narrow">
-      <h1>Gestão Educativa</h1>
-      <form onSubmit={submit}>
+    <main className="login">
+      <div className="brand" style={{ color: 'var(--fg)' }}>
+        <div className="brand-mark">PE</div>
+        Plataforma Educativa
+      </div>
+      <h1>Entrar</h1>
+      <form onSubmit={submit} className="card">
         <Field label="E-mail" error={fieldError(error, 'email')}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
         </Field>
         <Field label="Palavra-passe">
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         </Field>
-        <button disabled={busy}>Entrar</button>
+        <button className="primary" disabled={busy}>
+          Entrar
+        </button>
         <ErrorBanner error={error && !fieldError(error, 'email') ? error : null} />
       </form>
     </main>

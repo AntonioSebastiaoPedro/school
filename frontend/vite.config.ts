@@ -2,13 +2,15 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// O backend Laravel corre em :8000; o proxy mantém tudo na mesma origem (cookies de sessão Sanctum).
+// A API corre em :8000 (ou em VITE_API_PROXY, no contentor); o proxy mantém tudo na mesma origem (cookies de sessão Sanctum).
+const api = process.env.VITE_API_PROXY ?? 'http://localhost:8000'
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
-      '/sanctum': 'http://localhost:8000',
+      '/api': api,
+      '/sanctum': api,
     },
   },
   test: {

@@ -1,0 +1,22 @@
+services:
+  app:
+    build: { context: ., dockerfile: docker/php/Dockerfile, target: app }
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
+  nginx:
+    image: nginx:stable-alpine
+    depends_on: [app]
+  postgres:
+    image: postgres:${POSTGRES_VERSION}-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 3s
+      retries: 20
+
+volumes: { pgdata: {}, storage: {} }

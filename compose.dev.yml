@@ -1,0 +1,24 @@
+services:
+  app:
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment: { COMPOSER_HOME: /tmp/composer, HOME: /tmp }
+    volumes: [./backend:/var/www/html]
+  nginx:
+    ports: ["${HTTP_PORT}:80"]
+    volumes:
+      - ./docker/nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend:/var/www/html:ro
+  postgres:
+    ports: ["${DB_HOST_PORT}:5432"]
+    volumes:
+      # cria a base school_test, usada só pelos testes
+      - ./docker/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
+  node:
+    image: node:22-alpine
+    working_dir: /app
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment: { HOME: /tmp, VITE_API_PROXY: "http://nginx" }
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes: [./frontend:/app]
+    ports: ["${VITE_HOST_PORT}:5173"]
+    depends_on: [nginx]
