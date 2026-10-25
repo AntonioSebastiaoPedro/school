@@ -16,7 +16,7 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     // Endereço do frontend React (ligações de recuperação de palavra-passe).
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:18481'),
 
     /*
     |--------------------------------------------------------------------------

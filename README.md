@@ -33,7 +33,7 @@ Fora desta entrega: financeiro, portal dos encarregados, certificados de formaç
 ## Desenvolvimento
 
 ```bash
-make setup      # API em http://localhost:8000 · frontend em http://localhost:5180
+make setup      # API em http://localhost:18480 · frontend em http://localhost:18481
 ```
 
 Utilizadores de demonstração (só desenvolvimento): `director@demo.ao` e `admin@demo.ao`, palavra-passe `password`. As portas e o resto da configuração estão em `.env` (modelo em `.env.example`).
