@@ -26,15 +26,36 @@
 - `institution_user`: associação de utilizador à instituição e papel primário.
 - A autorização fina pode usar Policies/Gates e Spatie Permission; os papéis não substituem a verificação do tenant.
 
-### Educação
-- `students`: perfil educativo da pessoa.
-- `guardians`: perfil do encarregado.
-- `student_guardian`: relação validada entre encarregado e aluno.
-- `school_years`, `school_classes`, `classrooms`, `subjects`: estrutura escolar.
-- `enrollments`: matrícula do aluno num ano lectivo, classe e turma.
-- `courses`, `course_editions`, `training_enrollments`: catálogo, edição e inscrição em formação.
-- `attendance_records`: presenças por sessão, com vínculo à matrícula ou inscrição.
-- `assessments`, `assessment_results`: avaliações e resultados, separados do registo de presenças.
+### Catálogos globais (sem tenant)
+- `countries`, `provinces`, `municipalities`, `education_offices`: geografia de Angola. Província e município de um aluno são validados por FK composta contra o país e a província.
+- `grade_levels`: classes 0–9 com etapa, idades, escala (`max_score`, `pass_mark`), `has_national_exam` e `assessment_regime` (`none`, `lenient`, `strict`). Semeada no próprio `schema.sql`. Escala e nota mínima vivem aqui, nunca espalhadas pelo código.
+
+### Escola (por tenant)
+- `school_profiles`: perfil 1:1 de uma instituição de tipo `school` ou `both` (FK composta `(institution_id, institution_type)`). Código, ex-código, decreto, director, regime público/privado/misto, complexo, localização, trimestre activo. Centros de formação não têm perfil escolar.
+- `school_links`: escola certificadora por grupo de nível (`primary`, `lower_secondary`) para escolas privadas e mistas; aponta para outra instituição ou guarda os dados manuais.
+- `assessment_rules`: parâmetros de avaliação versionados (JSONB, uma versão activa), ver `regras-ensino.md`.
+- `school_years` (nome `AAAA/AAAA`, `EXCLUDE` contra sobreposição de datas, um único `active`), `rooms`, `sections` (turma: ano, classe, sala, turno, capacidade).
+- `subjects` e `grade_level_subjects`: catálogo e currículo por classe, copiados do modelo oficial na aprovação da escola e ajustáveis depois.
+
+### Alunos e encarregados
+- `students`: cadastro independente da matrícula. Género `M`/`F`, `student_number` (nº de processo gerado, único por tenant), naturalidade, documento opcional (BI com formato validado por `CHECK`), `father_name`/`mother_name` como filiação de recurso, contacto de emergência estruturado.
+- `guardians` e `student_guardian`: encarregado como entidade própria. `relationship` (`father`, `mother`, `other`) com índice único que impede dois pais ou duas mães por aluno; `is_financial_responsible`, `is_emergency_contact`.
+- A filiação impressa vem de `student_guardian` (pai/mãe) e, na falta, dos campos `father_name`/`mother_name`. Há um único ponto de formatação.
+
+### Matrículas e avaliação
+- `enrollments`: ano, classe, turma, `roll_number` (nº de ordem, único por turma), `enrollment_type` (`new`, `renewal`, `transfer_in`), `previous_enrollment_id`, `is_repeater`. FK composta `(section_id, school_year_id, grade_level_id, institution_id)` garante que a turma é do mesmo ano e da mesma classe da matrícula.
+- `enrollment_subject_choices`: escolhas por matrícula, nomeadamente Inglês ou Francês na Língua Estrangeira.
+- `student_transfers`: origem, destino, guia e data.
+- `grades`: `term` 0–3 e `kind` (`mac`, `npp`, `npt`, `exam`, `resit`) coerentes por `CHECK`. O valor máximo por classe e a ausência de notas na Iniciação são validados no serviço, porque dependem da classe da matrícula.
+- `grade_averages`: médias materializadas por matrícula e disciplina (T1–T3, ano, exame, recurso, final). Recalculadas a cada gravação; não são fonte de verdade, apenas cache de leitura derivada de `grades`.
+- `enrollment_results`: resultado do ano (`pending`, `promoted`, `resit`, `failed`, `dropped`). `resit` só ocorre em classes com exame nacional.
+- `historical_grades`: classificação final por aluno, classe e disciplina; alimenta certificados.
+- `grade_sheet_locks`: pauta fechada por turma e período.
+- `exams`: nº de exame, sala e estado (só 6.ª e 9.ª).
+- `attendance_records`: estados `present`, `absent`, `late`, `justified`; justificação obrigatória quando `justified`.
+
+### Formação
+- `courses`, `course_editions`, `training_enrollments`: inalterados.
 
 ### Financeiro e documentos
 - `charges`: obrigação/cobrança emitida.
@@ -42,14 +63,18 @@
 - `payment_allocations`: distribuição de um pagamento por uma ou mais cobranças.
 - `receipts`: documento emitido para um pagamento.
 - `cash_registers`: sessão de caixa.
-- `certificates`: certificados de conclusão.
+- `certificates`: certificados de conclusão de formação.
+- `document_sequences` e `issued_documents`: numeração, livro e folha dos documentos oficiais escolares (declaração, certificado, termo, atestado).
 - `documents`: metadados de ficheiros privados.
 - `audit_logs`: histórico de operações relevantes.
 
 ## 3. Regras de integridade recomendadas
 
-- Unicidade de `institution_id + code` para códigos de aluno, matrícula, curso, recibo e certificado.
-- Unicidade de matrícula por `institution_id + student_id + school_year_id`, excepto se o regulamento exigir múltiplas matrículas por programa.
+- Unicidade de `institution_id + code` para nº de processo (`student_number`), matrícula, curso, recibo e certificado.
+- Unicidade de matrícula por `institution_id + student_id + school_year_id`; a renovação cria nova linha com `previous_enrollment_id` e nunca substitui a anterior.
+- Um só ano lectivo `active` e sem sobreposição de datas por instituição.
+- A turma de uma matrícula pertence ao mesmo ano e classe (FK composta).
+- No máximo um pai e uma mãe por aluno.
 - Unicidade de inscrição por `institution_id + course_edition_id + student_id`.
 - FKs compostas para evitar associar uma turma de uma instituição a um aluno de outra.
 - Pagamento e cobrança devem pertencer ao mesmo tenant; `payment_allocations` valida ambos.
@@ -85,8 +110,8 @@ Como defesa adicional, avaliar PostgreSQL Row-Level Security. Se utilizada, conf
 
 ## 6. Decisões pendentes antes da migração definitiva
 
-- Identificação civil e campos obrigatórios exigidos por cada instituição.
-- Regras oficiais de classes, períodos de avaliação e transição de ano.
+- Pontos de `regras-ensino.md` §9 por validar com o Ministério da Educação (regime brando sem recurso, peso 40/60, MT sobre componentes presentes, faltas, desistência, idade máxima, modelos oficiais).
+- Geração em PDF dos documentos oficiais escolares (o modelo de dados já a suporta).
 - Política de emissão fiscal/numeração dos recibos.
 - Política de crédito/adiantamento e alocação automática de pagamentos.
 - Política de desconto, bolsa, isenção, mora e estorno.

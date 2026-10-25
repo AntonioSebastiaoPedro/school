@@ -2,14 +2,16 @@
 
 Versão inicial: 0.1.0  
 Stack: Laravel API + PostgreSQL + React + TypeScript  
-Âmbito: escolas (ensino primário e I ciclo) e centros de formação.
+Âmbito: escolas (Iniciação, ensino primário e I ciclo, classes 0–9, segundo `docs/regras-ensino.md`) e centros de formação.
 
 ## Conteúdo
 
+- `docs/regras-ensino.md`: regras do ensino angolano (classes, currículo, avaliação, aprovação, recurso, pendências).
 - `docs/modelo-dados.md`: modelo relacional, decisões, índices, isolamento multi-tenant e regras.
 - `database/schema.sql`: esquema PostgreSQL de referência para revisão técnica.
 - `api/openapi.yaml`: contrato REST inicial em OpenAPI 3.1 para consumo pelo frontend React.
-- `laravel/database/migrations/`: migration inicial para as tabelas nucleares de plataforma e identidade.
+- `../backend/database/migrations/`: migrations completas (12 módulos), geradas por `tools/build_migrations.py` a partir de `schema.sql`.
+- `tools/build_migrations.py`: gera as migrations; `schema.sql` é a única fonte de verdade.
 - `docs/plano-implementacao.md`: sequência recomendada de implementação e critérios de validação.
 
 ## Antes de usar em produção
@@ -31,7 +33,11 @@ Num ambiente de desenvolvimento PostgreSQL vazio:
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
 ```
 
-O SQL é uma referência de esquema; se as migrations Laravel forem a fonte de verdade, mantenha o SQL sincronizado com elas. Não mantenha dois mecanismos independentes de evolução do esquema.
+`schema.sql` é a fonte de verdade. Depois de o alterar, regenere as migrations:
+```bash
+python3 tools/build_migrations.py
+```
+Não edite as migrations à mão. A tabela `users` (e `password_reset_tokens`) está na primeira migration; a migration `users` por omissão do Laravel foi removida.
 
 ## Convenções
 

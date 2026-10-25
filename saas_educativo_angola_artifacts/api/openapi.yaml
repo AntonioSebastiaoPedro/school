@@ -2,7 +2,12 @@ openapi: 3.1.0
 info:
   title: SaaS Educativo Angola API
   version: 0.1.0
-  description: Contrato REST inicial. Os endpoints e esquemas devem evoluir com os requisitos validados.
+  description: >
+    Contrato REST. Autenticação por sessão (cookie, Sanctum). Os endpoints da área institucional
+    exigem o cabeçalho `X-Institution-Id` com a instituição activa; o servidor só o aceita se o
+    utilizador tiver associação activa a essa instituição, e a instituição estiver aprovada e activa
+    (caso contrário, 403). Com uma única associação o cabeçalho pode ser omitido.
+    Conflitos de dados (duplicação, sobreposição, capacidade, transição inválida) respondem 409.
 servers:
   - url: https://api.example.ao/api/v1
     description: Exemplo; substituir pelo domínio real
@@ -13,7 +18,12 @@ tags:
   - name: Subscriptions
   - name: Students
   - name: Guardians
+  - name: Geography
+  - name: School
+  - name: Curriculum
   - name: Enrollments
+  - name: Grades
+  - name: Documents
   - name: Courses
   - name: Training
   - name: Finance
@@ -48,6 +58,42 @@ paths:
       responses:
         "204": { description: Sessão terminada }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Pedir a recuperação da palavra-passe (resposta sempre igual)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200": { description: "Se o e-mail existir, receberá instruções" }
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Definir nova palavra-passe com o token recebido
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, email, password, password_confirmation]
+              properties:
+                token: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                password_confirmation: { type: string }
+      responses:
+        "200": { description: Palavra-passe actualizada }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /auth/me:
     get:
       tags: [Auth]
@@ -91,8 +137,23 @@ paths:
                 tax_identifier: { type: [string, "null"] }
                 province: { type: [string, "null"] }
                 municipality: { type: [string, "null"] }
+                school_profile:
+                  description: Obrigatório para `school` e `both`. Usado para criar o perfil escolar na aprovação.
+                  type: object
+                  required: [director_name, director_gender, regime]
+                  properties:
+                    director_name: { type: string, maxLength: 255 }
+                    director_gender: { type: string, enum: [M, F] }
+                    director_phone: { type: [string, "null"] }
+                    regime: { type: string, enum: [public, private, mixed] }
+                    is_complex: { type: boolean }
+                    school_code: { type: [string, "null"] }
+                    ex_code: { type: [string, "null"] }
+                    decree: { type: [string, "null"] }
+                    province_id: { type: [integer, "null"] }
+                    municipality_id: { type: [integer, "null"] }
       responses:
-        "201": { description: Pedido criado e pendente de análise }
+        "201": { description: Pedido criado e pendente de análise; não concede acesso operacional }
         "422": { $ref: "#/components/responses/ValidationError" }
   /admin/institution-applications:
     get:
@@ -128,6 +189,104 @@ paths:
         "200": { description: Decisão registada }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { description: Estado incompatível com a decisão }
+  /admin/plans:
+    get:
+      tags: [Subscriptions]
+      summary: Listar planos com funcionalidades e limites
+      responses:
+        "200": { description: Lista de planos }
+    post:
+      tags: [Subscriptions]
+      summary: Criar plano
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlanInput" }
+      responses:
+        "201": { description: Plano criado }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/plans/{id}:
+    patch:
+      tags: [Subscriptions]
+      summary: Actualizar plano
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlanInput" }
+      responses:
+        "200": { description: Plano actualizado }
+  /admin/institutions/{id}/subscriptions:
+    post:
+      tags: [Subscriptions]
+      summary: Associar subscrição e activar a instituição aprovada
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id: { type: integer }
+                status: { type: string, enum: [trialing, active], default: active }
+                starts_at: { type: [string, "null"], format: date-time }
+                ends_at: { type: [string, "null"], format: date-time }
+      responses:
+        "201": { description: Subscrição criada e instituição activa }
+        "409": { description: Instituição ainda não aprovada }
+  /admin/institutions/{id}/suspend:
+    post:
+      tags: [Subscriptions]
+      summary: Suspender instituição com motivo registado
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 1000 }
+      responses:
+        "200": { description: Instituição suspensa }
+  /admin/institutions/{id}/reactivate:
+    post:
+      tags: [Subscriptions]
+      summary: Reactivar instituição suspensa
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Instituição reactivada }
+        "409": { description: A instituição não está suspensa }
+  /admin/subscriptions/{id}/payments:
+    post:
+      tags: [Subscriptions]
+      summary: Registar pagamento manual da subscrição
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, method]
+              properties:
+                amount: { type: number, exclusiveMinimum: 0 }
+                method: { type: string, enum: [cash, bank_transfer, other_manual] }
+                reference: { type: [string, "null"] }
+                paid_at: { type: [string, "null"], format: date-time }
+                notes: { type: [string, "null"] }
+      responses:
+        "201": { description: Pagamento registado }
   /institution:
     get:
       tags: [Institutions]
@@ -170,7 +329,7 @@ paths:
           schema: { type: string }
         - in: query
           name: status
-          schema: { type: string, enum: [active, inactive, archived] }
+          schema: { type: string, enum: [active, inactive, transferred, graduated, archived] }
         - in: query
           name: page
           schema: { type: integer, minimum: 1, default: 1 }
@@ -255,13 +414,187 @@ paths:
               required: [guardian_id]
               properties:
                 guardian_id: { type: integer }
+                relationship: { type: string, enum: [father, mother, other], default: other }
                 relationship_label: { type: [string, "null"] }
                 is_primary: { type: boolean, default: false }
+                is_financial_responsible: { type: boolean, default: false }
+                is_emergency_contact: { type: boolean, default: false }
                 can_view_finance: { type: boolean, default: false }
                 can_view_academic: { type: boolean, default: true }
       responses:
         "201": { description: Associação criada; validar tenant e autorização }
-        "409": { description: Associação já existe }
+        "409": { description: "Associação já existe, ou aluno já tem pai/mãe associado" }
+  /geography/countries:
+    get:
+      tags: [Geography]
+      summary: Listar países
+      responses:
+        "200": { description: Lista de países com gentílico }
+  /geography/provinces:
+    get:
+      tags: [Geography]
+      summary: Listar províncias de um país
+      parameters:
+        - in: query
+          name: country_id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Lista de províncias }
+  /geography/municipalities:
+    get:
+      tags: [Geography]
+      summary: Listar municípios de uma província
+      parameters:
+        - in: query
+          name: province_id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Lista de municípios }
+  /school-profile:
+    get:
+      tags: [School]
+      summary: Consultar o perfil escolar da instituição activa
+      responses:
+        "200":
+          description: Perfil escolar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/SchoolProfile" }
+        "404": { description: Instituição sem perfil escolar (não é escola) }
+    put:
+      tags: [School]
+      summary: Criar ou actualizar o perfil escolar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SchoolProfile" }
+      responses:
+        "200": { description: Perfil actualizado }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /school-links:
+    get:
+      tags: [School]
+      summary: Listar escolas certificadoras por nível
+      responses:
+        "200": { description: Ligações por grupo de nível }
+    put:
+      tags: [School]
+      summary: Definir a escola certificadora de um grupo de nível (escolas privadas e mistas)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SchoolLinkInput" }
+      responses:
+        "200": { description: Ligação guardada }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /grade-levels:
+    get:
+      tags: [Curriculum]
+      summary: Catálogo global de classes 0 a 9
+      responses:
+        "200":
+          description: Classes com escala, nota mínima, idades e regime
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/GradeLevel" }
+  /subjects:
+    get:
+      tags: [Curriculum]
+      summary: Listar disciplinas da escola
+      responses:
+        "200": { description: Lista de disciplinas }
+    post:
+      tags: [Curriculum]
+      summary: Criar disciplina
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string, maxLength: 10 }
+                name: { type: string, maxLength: 120 }
+                category: { type: string, enum: [core, optional], default: core }
+                credits: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "201": { description: Disciplina criada }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /curriculum:
+    get:
+      tags: [Curriculum]
+      summary: Currículo da escola por classe
+      parameters:
+        - in: query
+          name: grade_level_id
+          schema: { type: integer, minimum: 0, maximum: 9 }
+      responses:
+        "200": { description: Disciplinas por classe com carga horária semanal }
+  /curriculum/{gradeLevelId}/subjects:
+    put:
+      tags: [Curriculum]
+      summary: Ajustar as disciplinas de uma classe
+      parameters:
+        - in: path
+          name: gradeLevelId
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 9 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subjects]
+              properties:
+                subjects:
+                  type: array
+                  items:
+                    type: object
+                    required: [subject_id, weekly_hours]
+                    properties:
+                      subject_id: { type: integer }
+                      weekly_hours: { type: integer, minimum: 1 }
+                      is_active: { type: boolean, default: true }
+      responses:
+        "200": { description: Currículo actualizado }
+  /assessment-rules:
+    get:
+      tags: [Grades]
+      summary: Regras de avaliação activas da escola
+      responses:
+        "200":
+          description: Parâmetros activos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AssessmentRules" }
+    put:
+      tags: [Grades]
+      summary: Criar nova versão das regras de avaliação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssessmentRules" }
+      responses:
+        "201": { description: Nova versão activa }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /school-years:
     get:
       tags: [Enrollments]
@@ -279,11 +612,110 @@ paths:
               type: object
               required: [name, starts_on, ends_on]
               properties:
-                name: { type: string, maxLength: 80 }
+                name: { type: string, pattern: "^[0-9]{4}/[0-9]{4}$", example: "2026/2027" }
                 starts_on: { type: string, format: date }
                 ends_on: { type: string, format: date }
       responses:
         "201": { description: Ano lectivo criado }
+        "409": { description: Datas sobrepostas a outro ano lectivo }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /school-years/{id}/activate:
+    post:
+      tags: [Enrollments]
+      summary: Activar o ano lectivo (o anterior passa a fechado)
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Ano activado }
+        "409": { description: Estado incompatível }
+  /rooms:
+    get:
+      tags: [Enrollments]
+      summary: Listar salas
+      responses:
+        "200": { description: Lista de salas }
+    post:
+      tags: [Enrollments]
+      summary: Criar sala
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+                capacity: { type: integer, minimum: 1, default: 40 }
+                type: { type: [string, "null"] }
+      responses:
+        "201": { description: Sala criada }
+  /sections:
+    get:
+      tags: [Enrollments]
+      summary: Listar turmas
+      parameters:
+        - in: query
+          name: school_year_id
+          schema: { type: integer }
+        - in: query
+          name: grade_level_id
+          schema: { type: integer, minimum: 0, maximum: 9 }
+      responses:
+        "200": { description: Lista de turmas }
+    post:
+      tags: [Enrollments]
+      summary: Criar turma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SectionInput" }
+      responses:
+        "201": { description: Turma criada }
+        "409": { description: Nome de turma repetido no ano e classe }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /sections/{id}/renumber:
+    post:
+      tags: [Enrollments]
+      summary: Renumerar a turma por ordem alfabética (nº de ordem da pauta)
+      description: Na matrícula o nº de ordem é o seguinte da turma; este endpoint reordena-o alfabeticamente.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Nº de ordem por matrícula }
+  /sections/{id}/close-year:
+    post:
+      tags: [Enrollments]
+      summary: Fechar o ano da turma e gravar o resultado de cada aluno
+      description: >
+        Exige as pautas dos trimestres 1 a 3 fechadas (409 caso contrário). Aplica `PromotionRules`
+        (a mesma definição da pauta final), grava `enrollment_results` e `historical_grades`.
+        Na Iniciação todos ficam aprovados. É idempotente: resultados definitivos não mudam, e
+        quem ficou em recurso (só 6.ª e 9.ª) é reavaliado ao voltar a fechar, depois de lançados
+        os NER. `recompute` recalcula também os definitivos.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recompute: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Resultados gravados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/EnrollmentResult" }
+        "409": { description: Pauta de algum trimestre ainda aberta }
   /enrollments:
     get:
       tags: [Enrollments]
@@ -293,33 +725,33 @@ paths:
           name: school_year_id
           schema: { type: integer }
         - in: query
+          name: section_id
+          schema: { type: integer }
+        - in: query
           name: status
-          schema: { type: string }
+          schema: { type: string, enum: [pending, approved, active, cancelled, completed, dropped, transferred] }
       responses:
         "200": { description: Lista paginada de matrículas }
     post:
       tags: [Enrollments]
       summary: Criar matrícula
+      description: >
+        O nº de ordem é atribuído automaticamente. Valida idade mínima da
+        classe, capacidade da turma e duplicação aluno-ano.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [student_id, school_year_id, school_class_id, enrollment_code]
-              properties:
-                student_id: { type: integer }
-                school_year_id: { type: integer }
-                school_class_id: { type: integer }
-                classroom_id: { type: [integer, "null"] }
-                enrollment_code: { type: string, maxLength: 80 }
+            schema: { $ref: "#/components/schemas/EnrollmentInput" }
       responses:
         "201": { description: Matrícula criada em estado pendente }
         "409": { description: Matrícula duplicada ou capacidade excedida }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /enrollments/{id}/decision:
     post:
       tags: [Enrollments]
-      summary: Aprovar ou cancelar matrícula
+      summary: Aprovar (pendente → activa), cancelar ou concluir matrícula
+      description: A transferência para outra escola tem endpoint próprio (`/enrollments/{id}/transfer`).
       parameters:
         - $ref: "#/components/parameters/Id"
       requestBody:
@@ -330,11 +762,198 @@ paths:
               type: object
               required: [decision]
               properties:
-                decision: { type: string, enum: [approve, cancel, transfer, complete] }
+                decision: { type: string, enum: [approve, cancel, complete] }
                 reason: { type: [string, "null"] }
       responses:
         "200": { description: Estado actualizado }
         "409": { description: Transição de estado inválida }
+  /enrollments/bulk-renew:
+    post:
+      tags: [Enrollments]
+      summary: Renovar matrículas em massa para o ano seguinte
+      description: >
+        Cria matrículas novas (`renewal`) com `previous_enrollment_id`.
+        Aprovados vão para a classe seguinte, reprovados repetem. Nunca
+        substitui uma matrícula existente; valida classe de destino e idade.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_school_year_id, to_school_year_id, section_map]
+              properties:
+                from_school_year_id: { type: integer }
+                to_school_year_id: { type: integer }
+                section_map:
+                  type: array
+                  items:
+                    type: object
+                    required: [from_section_id, to_section_id]
+                    properties:
+                      from_section_id: { type: integer }
+                      to_section_id: { type: integer }
+      responses:
+        "200":
+          description: Resumo da renovação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                  skipped: { type: array, items: { type: object, properties: { enrollment_id: { type: integer }, reason: { type: string } } } }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /enrollments/{id}/transfer:
+    post:
+      tags: [Enrollments]
+      summary: Registar a transferência do aluno para outra escola
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [other_school_name, transfer_date]
+              properties:
+                other_school_name: { type: string, maxLength: 255 }
+                guide_number: { type: [string, "null"], maxLength: 80 }
+                transfer_date: { type: string, format: date }
+                reason: { type: [string, "null"] }
+      responses:
+        "200": { description: Transferência registada }
+        "409": { description: Matrícula não transferível }
+  /grades:
+    get:
+      tags: [Grades]
+      summary: Grelha de notas de uma turma, disciplina e período
+      parameters:
+        - in: query
+          name: section_id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: subject_id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: term
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 3 }
+      responses:
+        "200":
+          description: Linhas por aluno com MAC, NPP, NPT (ou NE/NER no período 0), MT e escala da classe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GradeGrid" }
+        "422": { description: "Na Iniciação não se lançam notas." }
+    put:
+      tags: [Grades]
+      summary: Gravar notas da grelha
+      description: >
+        Aceita vírgula decimal e arredonda a 2 casas. Rejeita valores fora de
+        0 a máximo da classe, alunos não matriculados na turma, a Iniciação e
+        pautas fechadas. 0 ou vazio significa sem nota. Exame e recurso (período 0)
+        só existem em classes com exame nacional; o recurso só em classes com
+        exame nacional (6.ª e 9.ª).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section_id, subject_id, term, entries]
+              properties:
+                section_id: { type: integer }
+                subject_id: { type: integer }
+                term: { type: integer, minimum: 0, maximum: 3 }
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [enrollment_id, kind, value]
+                    properties:
+                      enrollment_id: { type: integer }
+                      kind: { type: string, enum: [mac, npp, npt, exam, resit] }
+                      value: { type: [number, "null"], minimum: 0 }
+      responses:
+        "200": { description: Notas gravadas e médias recalculadas }
+        "409": { description: Pauta fechada para o período }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /grade-sheets/{sectionId}:
+    get:
+      tags: [Grades]
+      summary: Pauta da turma
+      parameters:
+        - in: path
+          name: sectionId
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: type
+          required: true
+          schema: { type: string, enum: [term, final, resit] }
+        - in: query
+          name: term
+          schema: { type: integer, minimum: 1, maximum: 3 }
+      responses:
+        "200":
+          description: Pauta com MAC, NPP, NPT, MT, MFD, NE, MFA, NER e observação conforme o tipo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GradeSheet" }
+        "404": { description: "Pauta de recurso pedida para classe sem exame nacional, ou pauta da Iniciação" }
+  /grade-sheets/{sectionId}/locks:
+    put:
+      tags: [Grades]
+      summary: Fechar ou reabrir a pauta de um período (direcção)
+      parameters:
+        - in: path
+          name: sectionId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [term, locked]
+              properties:
+                term: { type: integer, minimum: 0, maximum: 3 }
+                locked: { type: boolean }
+      responses:
+        "200": { description: Estado da pauta actualizado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /documents/{type}/issue:
+    post:
+      tags: [Documents]
+      summary: Registar a emissão de um documento oficial e obter a numeração
+      description: >
+        Atribui nº de documento, livro e folha. Tipos: declaration (1.ª–9.ª),
+        certificate (6.ª e 9.ª, 3.º trimestre), term (6.ª e 9.ª), attestation
+        (Iniciação, 3.º trimestre). A geração do PDF fica para fase posterior.
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema: { type: string, enum: [declaration, certificate, term, attestation] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, enrollment_id]
+              properties:
+                student_id: { type: integer }
+                enrollment_id: { type: integer }
+      responses:
+        "201": { description: Emissão registada }
+        "409": { description: Documento não aplicável à classe ou período }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /courses:
     get:
       tags: [Courses]
@@ -563,7 +1182,7 @@ paths:
           required: true
           schema: { type: string, format: date }
       responses:
-        "200": { description: Totais de cobranças, recebimentos, dívida e estornos }
+        "200": { description: "Totais de cobranças, recebimentos, dívida e estornos" }
 components:
   securitySchemes:
     cookieAuth:
@@ -588,6 +1207,25 @@ components:
         operational_status: { type: string }
         province: { type: [string, "null"] }
         municipality: { type: [string, "null"] }
+    PlanInput:
+      type: object
+      required: [name, code, price, billing_interval]
+      properties:
+        name: { type: string, maxLength: 100 }
+        code: { type: string, maxLength: 60 }
+        description: { type: [string, "null"] }
+        price: { type: number, minimum: 0 }
+        billing_interval: { type: string, enum: [monthly, quarterly, yearly] }
+        is_active: { type: boolean }
+        features:
+          type: array
+          items:
+            type: object
+            required: [feature_key]
+            properties:
+              feature_key: { type: string, description: "Ex.: max_active_students" }
+              enabled: { type: [boolean, "null"] }
+              numeric_limit: { type: [integer, "null"], minimum: 0 }
     InstitutionMembership:
       type: object
       properties:
@@ -597,34 +1235,185 @@ components:
         status: { type: string }
     StudentInput:
       type: object
-      required: [student_code, first_name, last_name]
+      required: [first_name, last_name, gender]
       properties:
-        student_code: { type: string, maxLength: 80 }
-        first_name: { type: string, maxLength: 100 }
-        last_name: { type: string, maxLength: 100 }
-        preferred_name: { type: [string, "null"], maxLength: 100 }
+        student_number: { type: [string, "null"], maxLength: 30, description: "Gerado se omitido (6 dígitos)" }
+        first_name: { type: string, maxLength: 255 }
+        last_name: { type: string, maxLength: 255 }
+        gender: { type: string, enum: [M, F] }
         birth_date: { type: [string, "null"], format: date }
-        gender: { type: [string, "null"], maxLength: 30 }
-        email: { type: [string, "null"], format: email }
-        phone: { type: [string, "null"], maxLength: 40 }
+        birth_country_id: { type: [integer, "null"] }
+        nationality_id: { type: [integer, "null"] }
+        province_id: { type: [integer, "null"] }
+        municipality_id: { type: [integer, "null"] }
+        father_name: { type: [string, "null"], maxLength: 255 }
+        mother_name: { type: [string, "null"], maxLength: 255 }
+        document_type: { type: [string, "null"], enum: [birth_record, personal_card, identity_card, passport, null] }
+        document_number: { type: [string, "null"], maxLength: 50, description: "BI: 9 dígitos, 2 letras, 3 dígitos" }
+        document_issuer: { type: [string, "null"], maxLength: 255 }
+        document_issue_date: { type: [string, "null"], format: date }
+        contact_phone: { type: [string, "null"], maxLength: 40 }
         address: { type: [string, "null"] }
+        emergency_contact_name: { type: [string, "null"], maxLength: 255 }
+        emergency_contact_relationship: { type: [string, "null"], maxLength: 60 }
+        emergency_contact_phone: { type: [string, "null"], maxLength: 40 }
     Student:
       allOf:
         - $ref: "#/components/schemas/StudentInput"
         - type: object
           properties:
             id: { type: integer }
-            status: { type: string, enum: [active, inactive, archived] }
+            student_number: { type: string }
+            status: { type: string, enum: [active, inactive, transferred, graduated, archived] }
             created_at: { type: string, format: date-time }
+    SchoolProfile:
+      type: object
+      required: [director_name, director_gender, regime]
+      properties:
+        school_code: { type: [string, "null"], maxLength: 100 }
+        ex_code: { type: [string, "null"], maxLength: 100 }
+        decree: { type: [string, "null"], maxLength: 100 }
+        director_name: { type: string, maxLength: 255 }
+        director_gender: { type: string, enum: [M, F] }
+        director_phone: { type: [string, "null"], maxLength: 40 }
+        is_complex: { type: boolean }
+        regime: { type: string, enum: [public, private, mixed] }
+        province_id: { type: [integer, "null"] }
+        municipality_id: { type: [integer, "null"] }
+        education_office_id: { type: [integer, "null"] }
+        district: { type: [string, "null"], maxLength: 100 }
+        commune: { type: [string, "null"], maxLength: 100 }
+        active_trimester: { type: integer, minimum: 1, maximum: 3 }
+    SchoolLinkInput:
+      type: object
+      required: [level_group]
+      properties:
+        level_group: { type: string, enum: [primary, lower_secondary] }
+        public_institution_id: { type: [integer, "null"] }
+        certifying_school_name: { type: [string, "null"], maxLength: 255 }
+        certifying_director_name: { type: [string, "null"], maxLength: 255 }
+        certifying_director_gender: { type: [string, "null"], enum: [M, F, null] }
+        certifying_school_code: { type: [string, "null"] }
+        certifying_ex_code: { type: [string, "null"] }
+        certifying_district: { type: [string, "null"] }
+        certifying_decree: { type: [string, "null"] }
+    GradeLevel:
+      type: object
+      properties:
+        id: { type: integer }
+        grade_number: { type: integer, minimum: 0, maximum: 9 }
+        code: { type: string }
+        name: { type: string }
+        stage: { type: string, enum: [preschool, primary, lower_secondary] }
+        min_age: { type: integer }
+        max_age: { type: integer }
+        max_score: { type: [integer, "null"], description: "Nulo na Iniciação (sem notas)" }
+        pass_mark: { type: [integer, "null"] }
+        has_national_exam: { type: boolean }
+        assessment_regime: { type: string, enum: [none, lenient, strict] }
+    AssessmentRules:
+      type: object
+      description: Parâmetros activos; valores por omissão em docs/regras-ensino.md
+      properties:
+        mt_divisor_mode: { type: string, enum: [present, fixed3], default: present }
+        weights:
+          type: object
+          properties:
+            year: { type: number, default: 0.4 }
+            exam: { type: number, default: 0.6 }
+        nuclear_subjects:
+          type: array
+          items: { type: string }
+          default: [LP, MAT]
+        strict:
+          type: object
+          properties:
+            approve_max_negatives: { type: integer, default: 0 }
+            resit_max_negatives: { type: integer, default: 2 }
+        lenient:
+          type: object
+          description: Sem recurso; reprova com mais negativas que o limite ou com LP e MAT ambas negativas
+          properties:
+            approve_max_negatives: { type: integer, default: 2 }
+            fail_if_all_nuclear_negative: { type: boolean, default: true }
+        attendance_limit: { type: [number, "null"], default: null }
+        dropout_enabled: { type: boolean, default: false }
+    SectionInput:
+      type: object
+      required: [school_year_id, grade_level_id, name, shift]
+      properties:
+        school_year_id: { type: integer }
+        grade_level_id: { type: integer, minimum: 0, maximum: 9 }
+        room_id: { type: [integer, "null"] }
+        name: { type: string, maxLength: 50 }
+        shift: { type: string, enum: [morning, afternoon, night] }
+        capacity: { type: integer, minimum: 1, default: 40 }
+    EnrollmentInput:
+      type: object
+      required: [student_id, school_year_id, grade_level_id, section_id]
+      properties:
+        student_id: { type: integer }
+        school_year_id: { type: integer }
+        grade_level_id: { type: integer, minimum: 0, maximum: 9 }
+        section_id: { type: integer }
+        enrollment_type: { type: string, enum: [new, renewal, transfer_in], default: new }
+        origin_school: { type: [string, "null"], maxLength: 255 }
+        is_repeater: { type: boolean, default: false }
+        foreign_language: { type: [string, "null"], enum: [english, french, null] }
+    EnrollmentResult:
+      type: object
+      properties:
+        enrollment_id: { type: integer }
+        status: { type: string, enum: [pending, promoted, resit, failed, dropped] }
+        failed_subjects: { type: integer }
+        reason: { type: [string, "null"] }
+    GradeGrid:
+      type: object
+      properties:
+        scale: { type: object, properties: { max_score: { type: integer }, pass_mark: { type: integer } } }
+        locked: { type: boolean }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              enrollment_id: { type: integer }
+              roll_number: { type: [integer, "null"] }
+              student_name: { type: string }
+              mac: { type: [number, "null"] }
+              npp: { type: [number, "null"] }
+              npt: { type: [number, "null"] }
+              mt: { type: [number, "null"] }
+              exam: { type: [number, "null"] }
+              resit: { type: [number, "null"] }
+    GradeSheet:
+      type: object
+      properties:
+        type: { type: string, enum: [term, final, resit] }
+        subjects: { type: array, items: { type: object, properties: { id: { type: integer }, code: { type: string } } } }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              enrollment_id: { type: integer }
+              roll_number: { type: [integer, "null"] }
+              student_name: { type: string }
+              values: { type: object, additionalProperties: { type: object } }
+              outcome: { type: string, enum: [pending, promoted, resit, failed, dropped] }
     GuardianInput:
       type: object
       required: [first_name, last_name]
       properties:
-        first_name: { type: string, maxLength: 100 }
-        last_name: { type: string, maxLength: 100 }
+        first_name: { type: string, maxLength: 255 }
+        last_name: { type: string, maxLength: 255 }
+        document_type: { type: [string, "null"], enum: [birth_record, personal_card, identity_card, passport, null] }
+        document_number: { type: [string, "null"], maxLength: 50 }
         email: { type: [string, "null"], format: email }
         phone: { type: [string, "null"], maxLength: 40 }
-        relationship_label: { type: [string, "null"], maxLength: 60 }
+        phone_alt: { type: [string, "null"], maxLength: 40 }
+        profession: { type: [string, "null"], maxLength: 120 }
+        address: { type: [string, "null"] }
   responses:
     Unauthenticated:
       description: Sessão inexistente ou expirada

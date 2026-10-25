@@ -243,7 +243,7 @@ Um curso representa a definição do programa de formação; uma edição repres
 - RF-065: O sistema deve permitir gerar pautas e relatórios académicos, conforme as permissões.
 - RF-066: O sistema deve permitir corrigir registos, mantendo o histórico das alterações relevantes.
 
-Na escola, a avaliação deverá suportar disciplinas e períodos lectivos. No centro de formação, deverá suportar critérios associados ao curso ou módulo formativo.
+Na escola, a avaliação segue as regras do módulo M (trimestres, MAC/NPP/NPT, exames na 6.ª e 9.ª). No centro de formação, deverá suportar critérios associados ao curso ou módulo formativo.
 
 ### 4.8. Módulo H — Gestão financeira educativa
 
@@ -314,6 +314,34 @@ Os indicadores do dashboard devem ser derivados dos dados operacionais, evitando
 - RF-107: O sistema deve permitir consultar os registos de auditoria segundo as permissões.
 - RF-108: O administrador central deve poder apoiar instituições sem obter acesso irrestrito e permanente aos seus dados.
 - RF-109: O acesso de suporte a dados institucionais, quando necessário, deve ser autorizado, limitado e auditado.
+
+### 4.13. Módulo M — Regras do ensino angolano (escolas)
+
+Detalhe normativo em `saas_educativo_angola_artifacts/docs/regras-ensino.md`.
+
+| ID | Requisito funcional | Prioridade |
+| -- | ------------------- | ---------- |
+| RF-110 | O sistema deve disponibilizar o catálogo global de classes 0 a 9 (Iniciação, Ensino Primário e I Ciclo) com etapa, idades, escala, nota mínima, regime de avaliação e indicação de exame nacional. | P0 |
+| RF-111 | O sistema deve provisionar para cada escola aprovada o currículo por classe (disciplinas, carga horária, categoria obrigatória ou opcional), ajustável pela escola. | P0 |
+| RF-112 | O sistema deve guardar o perfil da escola: código, ex-código, decreto de criação, director e género, complexo escolar, regime público, privado ou misto, localização e direcção municipal. | P0 |
+| RF-113 | Escolas privadas e mistas devem poder indicar a escola pública certificadora por grupo de nível. | P1 |
+| RF-114 | O sistema deve registar o aluno com género M/F, naturalidade (país, província, município), documento de identificação opcional, nº de processo gerado e filiação estruturada. | P0 |
+| RF-115 | O sistema deve recolher o encarregado de educação como entidade própria (parentesco, documento, contactos, profissão, responsável financeiro) e contactos de emergência com nome e parentesco. | P0 |
+| RF-116 | O sistema deve validar a idade mínima da classe na matrícula e assinalar a idade máxima. | P0 |
+| RF-117 | O sistema deve atribuir automaticamente o nº de ordem (roll number) à matrícula. | P0 |
+| RF-118 | O sistema deve verificar a capacidade da turma (e da sala) na matrícula. | P0 |
+| RF-119 | O sistema deve permitir lançar notas trimestrais MAC, NPP e NPT por disciplina, na escala da classe (0–10 até à 6.ª, 0–20 da 7.ª à 9.ª), recusando valores fora da escala e notas na Iniciação. | P0 |
+| RF-120 | O sistema deve calcular MT, MFD e MFA num único módulo de domínio, com parâmetros configuráveis por escola. | P0 |
+| RF-121 | O sistema deve registar o exame nacional (NE) e o exame de recurso (NER) apenas para a 6.ª e a 9.ª classe. | P0 |
+| RF-122 | O sistema deve decidir aprovado, recurso (só 6.ª e 9.ª) ou reprovado por contagem de negativas, com uma única definição aplicada na pauta, no assistente de promoção e no fecho do ano. | P0 |
+| RF-123 | O sistema deve permitir fechar e reabrir pautas por turma, ano e período, impedindo a gravação de notas em pautas fechadas. | P0 |
+| RF-124 | O sistema deve fechar o ano lectivo por turma, gravando resultado do aluno e histórico de classificações finais. | P0 |
+| RF-125 | O sistema deve renovar matrículas em massa sem substituir matrículas existentes, validando classe de destino e idade. | P0 |
+| RF-126 | O sistema deve registar a transferência de alunos (escola de origem e destino, guia, data). | P1 |
+| RF-127 | O sistema deve guardar o idioma de Língua Estrangeira (Inglês ou Francês) escolhido por aluno. | P1 |
+| RF-128 | O sistema deve gerar pautas trimestral, final e de recurso por turma, com os dados institucionais lidos do perfil da escola. | P0 |
+| RF-129 | O sistema deve gerir a numeração, o livro e a folha dos documentos oficiais emitidos (declaração, certificado, termo, atestado). | P1 |
+| RF-130 | A emissão em PDF da declaração, certificado, termo e atestado fica prevista no modelo de dados e adiada para fase posterior. | P2 |
 
 ## 5. Requisitos não funcionais
 
@@ -416,6 +444,21 @@ As regras de negócio representam condições que devem ser respeitadas independ
 - RN-041: A verificação pública de certificados deve disponibilizar apenas os dados estritamente necessários.
 - RN-042: Um certificado emitido pelo sistema não deve ser apresentado como oficialmente reconhecido sem fundamento aplicável.
 
+### 6.7. Regras do ensino angolano
+
+- RN-043: Cada classe tem escala e nota mínima próprias (0–10 e 5 até à 6.ª; 0–20 e 10 da 7.ª à 9.ª); a Iniciação não tem notas.
+- RN-044: A nota 0 ou vazia significa "sem nota" e nunca conta como negativa.
+- RN-045: O MT é a média dos componentes presentes; o MFD é a média dos MT preenchidos; a MFA arredonda ao inteiro e, nas classes de exame, combina MFD (40%) e exame (60%); o NER substitui a classificação.
+- RN-046: Apenas a 6.ª e a 9.ª têm exame nacional e exame de recurso.
+- RN-047: Nas classes de exame, 0 negativas aprova, 1 a 2 dão recurso e 3 ou mais reprovam; após o recurso, aprova com 0 negativas e reprova nos restantes casos.
+- RN-048: Nas restantes classes não há recurso: até 2 negativas aprova, excepto se LP e MAT forem ambas negativas; 3 ou mais negativas reprovam.
+- RN-049: A decisão de aprovação usa uma só implementação (`PromotionRules`) em todos os fluxos; os parâmetros são configuráveis por escola.
+- RN-050: Uma pauta fechada não aceita gravação de notas.
+- RN-051: O nº de processo é único por instituição e gerado pelo sistema; o nº de ordem é atribuído à matrícula.
+- RN-052: A renovação nunca substitui uma matrícula existente.
+- RN-053: Os documentos oficiais não contêm valores fixos no código; usam o perfil da escola e, para escolas privadas ou mistas, os dados completos da escola certificadora.
+- RN-054: Um ano lectivo activo por instituição; datas sem sobreposição.
+
 ## 7. Modelo conceptual de dados
 
 A modelação deve começar pelas entidades do domínio e pelas suas relações, antes da criação das migrations.
@@ -435,16 +478,22 @@ A modelação deve começar pelas entidades do domínio e pelas suas relações,
 | `students`                           | Perfil educativo dos alunos e formandos, se for separado do cadastro comum. |
 | `guardians`                          | Perfil dos encarregados de educação.                                        |
 | `student_guardian`                   | Associação entre alunos e encarregados.                                     |
+| `school_profiles`                    | Perfil escolar da instituição (código, decreto, director, regime).          |
+| `school_links`                       | Escola certificadora por nível.                                             |
 | `school_years`                       | Anos lectivos.                                                              |
-| `classes`                            | Classes escolares.                                                          |
-| `classrooms`                         | Turmas e grupos lectivos.                                                   |
-| `subjects`                           | Disciplinas.                                                                |
+| `grade_levels`                       | Catálogo global de classes 0–9.                                             |
+| `sections` e `rooms`                 | Turmas e salas.                                                             |
+| `subjects`, `grade_level_subjects`   | Disciplinas e currículo por classe.                                         |
+| `grades`, `grade_averages`           | Notas lançadas e médias materializadas.                                     |
+| `enrollment_results`                 | Resultado do ano por matrícula.                                             |
+| `historical_grades`                  | Classificações finais por classe.                                           |
+| `issued_documents`                   | Documentos oficiais numerados.                                              |
 | `enrollments`                        | Matrículas escolares.                                                       |
 | `courses`                            | Catálogo de cursos.                                                         |
 | `course_editions`                    | Realizações concretas dos cursos.                                           |
 | `training_enrollments`               | Inscrições em edições de cursos.                                            |
 | `attendance_records`                 | Registos de presença.                                                       |
-| `assessments` e `assessment_results` | Avaliações e resultados.                                                    |
+| `assessments` e `assessment_results` | Avaliações da formação (a escola usa `grades`).                             |
 | `charges`                            | Cobranças emitidas.                                                         |
 | `payments`                           | Pagamentos registados.                                                      |
 | `payment_allocations`                | Distribuição dos pagamentos pelas cobranças.                                |
@@ -459,7 +508,35 @@ Esta lista é conceptual. Não significa que cada item deva corresponder obrigat
 
 ### 7.2. Relações principais
 
-\#chatgpt-mermaid-\_r_h3\_{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";font-size:16px;fill:rgb(237, 237, 237);}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#chatgpt-mermaid-\_r_h3\_ .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#chatgpt-mermaid-\_r_h3\_ .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#chatgpt-mermaid-\_r_h3\_ .error-icon{fill:rgb(48, 48, 48);}#chatgpt-mermaid-\_r_h3\_ .error-text{fill:rgb(237, 237, 237);stroke:rgb(237, 237, 237);}#chatgpt-mermaid-\_r_h3\_ .edge-thickness-normal{stroke-width:1px;}#chatgpt-mermaid-\_r_h3\_ .edge-thickness-thick{stroke-width:3.5px;}#chatgpt-mermaid-\_r_h3\_ .edge-pattern-solid{stroke-dasharray:0;}#chatgpt-mermaid-\_r_h3\_ .edge-thickness-invisible{stroke-width:0;fill:none;}#chatgpt-mermaid-\_r_h3\_ .edge-pattern-dashed{stroke-dasharray:3;}#chatgpt-mermaid-\_r_h3\_ .edge-pattern-dotted{stroke-dasharray:2;}#chatgpt-mermaid-\_r_h3\_ .marker{fill:rgb(175, 175, 175);stroke:rgb(175, 175, 175);}#chatgpt-mermaid-\_r_h3\_ .marker.cross{stroke:rgb(175, 175, 175);}#chatgpt-mermaid-\_r_h3\_ svg{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";font-size:16px;}#chatgpt-mermaid-\_r_h3\_ p{margin:0;}#chatgpt-mermaid-\_r_h3\_ .entityBox{fill:rgb(9, 23, 44);stroke:rgb(31, 78, 148);}#chatgpt-mermaid-\_r_h3\_ .relationshipLabelBox{fill:rgb(48, 48, 48);opacity:0.7;background-color:rgb(48, 48, 48);}#chatgpt-mermaid-\_r_h3\_ .relationshipLabelBox rect{opacity:0.5;}#chatgpt-mermaid-\_r_h3\_ .labelBkg{background-color:rgba(48, 48, 48, 0.5);}#chatgpt-mermaid-\_r_h3\_ .edgeLabel{background-color:rgb(0, 0, 0);}#chatgpt-mermaid-\_r_h3\_ .edgeLabel .label rect{fill:rgb(0, 0, 0);}#chatgpt-mermaid-\_r_h3\_ .edgeLabel .label text{fill:rgb(237, 237, 237);}#chatgpt-mermaid-\_r_h3\_ .edgeLabel .label{fill:rgb(31, 78, 148);font-size:14px;}#chatgpt-mermaid-\_r_h3\_ .label{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";color:rgb(237, 237, 237);}#chatgpt-mermaid-\_r_h3\_ .edge-pattern-dashed{stroke-dasharray:8,8;}#chatgpt-mermaid-\_r_h3\_ .node rect,#chatgpt-mermaid-\_r_h3\_ .node circle,#chatgpt-mermaid-\_r_h3\_ .node ellipse,#chatgpt-mermaid-\_r_h3\_ .node polygon{fill:rgb(9, 23, 44);stroke:rgb(31, 78, 148);stroke-width:1px;}#chatgpt-mermaid-\_r_h3\_ .relationshipLine{stroke:rgb(175, 175, 175);stroke-width:1px;fill:none;}#chatgpt-mermaid-\_r_h3\_ .marker{fill:none!important;stroke:rgb(175, 175, 175)!important;stroke-width:1;}#chatgpt-mermaid-\_r_h3\_ [data-look=neo].labelBkg{background-color:rgba(48, 48, 48, 0.5);}#chatgpt-mermaid-\_r_h3\_ .node .neo-node{stroke:rgb(31, 78, 148);}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node rect,#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].cluster rect,#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node polygon{stroke:url(#chatgpt-mermaid-\_r_h3\_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].swimlane.cluster rect{filter:none;}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node path{stroke:url(#chatgpt-mermaid-\_r_h3\_-gradient);stroke-width:1px;}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node .neo-line path{stroke:rgb(31, 78, 148);filter:none;}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node circle{stroke:url(#chatgpt-mermaid-\_r_h3\_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].node circle .state-start{fill:#000000;}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].icon-shape .icon{fill:url(#chatgpt-mermaid-\_r_h3\_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-\_r_h3\_ [data-look="neo"].icon-shape .icon-neo path{stroke:url(#chatgpt-mermaid-\_r_h3\_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-\_r_h3\_ :root{--mermaid-font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";}INSTITUTIONINSTITUTION_USERUSERSUBSCRIPTIONPLANSTUDENTENROLLMENTSCHOOL_YEARCLASSROOMSTUDENT_GUARDIANGUARDIANCOURSECOURSE_EDITIONTRAINING_ENROLLMENTCHARGEPAYMENT_ALLOCATIONPAYMENTCERTIFICATEhasbelongs_tohasdefinesregistershascontainsreceiveslinkedresponsible_foroffershasacceptsjoinsbilledsettled_byallocatesmay_generate
+```mermaid
+erDiagram
+    INSTITUTION ||--o| SCHOOL_PROFILE : "tem (escolas)"
+    INSTITUTION ||--o{ INSTITUTION_USER : tem
+    USER ||--o{ INSTITUTION_USER : pertence
+    INSTITUTION ||--o{ SUBSCRIPTION : contrata
+    PLAN ||--o{ SUBSCRIPTION : define
+    INSTITUTION ||--o{ STUDENT : regista
+    STUDENT ||--o{ STUDENT_GUARDIAN : tem
+    GUARDIAN ||--o{ STUDENT_GUARDIAN : responsavel
+    INSTITUTION ||--o{ SCHOOL_YEAR : define
+    GRADE_LEVEL ||--o{ SECTION : classifica
+    SCHOOL_YEAR ||--o{ SECTION : contem
+    SECTION ||--o{ ENROLLMENT : recebe
+    STUDENT ||--o{ ENROLLMENT : matricula
+    GRADE_LEVEL ||--o{ GRADE_LEVEL_SUBJECT : curriculo
+    SUBJECT ||--o{ GRADE_LEVEL_SUBJECT : leccionada
+    ENROLLMENT ||--o{ GRADE : recebe
+    ENROLLMENT ||--o| ENROLLMENT_RESULT : resulta
+    ENROLLMENT ||--o{ GRADE_AVERAGE : materializa
+    ENROLLMENT ||--o{ ATTENDANCE_RECORD : regista
+    COURSE ||--o{ COURSE_EDITION : oferece
+    COURSE_EDITION ||--o{ TRAINING_ENROLLMENT : aceita
+    STUDENT ||--o{ TRAINING_ENROLLMENT : inscreve
+    TRAINING_ENROLLMENT ||--o| CERTIFICATE : gera
+    CHARGE ||--o{ PAYMENT_ALLOCATION : liquidada
+    PAYMENT ||--o{ PAYMENT_ALLOCATION : aloca
+    PAYMENT ||--o| RECEIPT : emite
+```
 
 O diagrama representa relações conceptuais. A implementação deverá considerar as chaves estrangeiras, os limites institucionais, a unicidade dos identificadores e os diferentes ciclos de vida.
 
@@ -780,7 +857,7 @@ Antes de começar a implementação, convém decidir os seguintes pontos:
 3. Se o registo de pagamentos será sempre confirmado manualmente ou se haverá estados de validação e aprovação.
 4. Como serão definidos os limites dos planos comerciais.
 5. Se o portal dos encarregados permitirá apenas consulta ou também pedidos de matrícula e carregamento de documentos.
-6. Quais serão os documentos e critérios de aprovação de cada tipo de instituição.
+6. Quais serão os documentos de cada tipo de instituição (critérios de aprovação escolar: ver módulo M e `docs/regras-ensino.md`, secção 9, para os pontos por validar).
 7. Quais os requisitos legais e fiscais aplicáveis aos recibos e certificados emitidos.
 8. Qual será a política de conservação, exportação e eliminação de dados quando uma instituição terminar a subscrição.
 
