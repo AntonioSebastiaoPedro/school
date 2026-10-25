@@ -626,7 +626,7 @@ CREATE TABLE exams (
 
 CREATE TABLE document_sequences (
     institution_id BIGINT NOT NULL REFERENCES institutions(id) ON DELETE RESTRICT,
-    document_type VARCHAR(20) NOT NULL CHECK (document_type IN ('declaration','certificate','term','attestation')),
+    document_type VARCHAR(20) NOT NULL CHECK (document_type IN ('declaration','certificate','term','attestation','receipt','payment','charge')),
     year SMALLINT NOT NULL,
     last_number INTEGER NOT NULL DEFAULT 0 CHECK (last_number >= 0),
     PRIMARY KEY (institution_id, document_type, year)
@@ -771,7 +771,7 @@ CREATE TABLE payments (
     payment_code VARCHAR(80) NOT NULL,
     amount NUMERIC(19,2) NOT NULL CHECK (amount > 0),
     currency CHAR(3) NOT NULL DEFAULT 'AOA',
-    method VARCHAR(30) NOT NULL CHECK (method IN ('cash','bank_transfer','other_manual')),
+    method VARCHAR(30) NOT NULL CHECK (method IN ('cash','card_terminal','bank_transfer','deposit','other_manual')),
     status VARCHAR(20) NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending','confirmed','reversed')),
     reference VARCHAR(120),
     paid_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -779,9 +779,11 @@ CREATE TABLE payments (
     reversed_at TIMESTAMPTZ,
     reversal_reason TEXT,
     idempotency_key VARCHAR(120),
+    request_hash CHAR(64),
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (status <> 'reversed' OR (reversed_at IS NOT NULL AND reversal_reason IS NOT NULL)),
     UNIQUE (institution_id, payment_code),
     UNIQUE (institution_id, idempotency_key),
     UNIQUE (id, institution_id),
@@ -813,6 +815,7 @@ CREATE TABLE receipts (
     status VARCHAR(20) NOT NULL DEFAULT 'issued' CHECK (status IN ('issued','void')),
     void_reason TEXT,
     document_path TEXT,
+    CHECK (status = 'issued' OR void_reason IS NOT NULL),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (institution_id, receipt_code),
     UNIQUE (institution_id, payment_id),

@@ -44,8 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: As migrations geradas estão em dia com o schema.sql
         run: |
-          python3 saas_educativo_angola_artifacts/tools/build_migrations.py
-          git diff --exit-code backend/database/migrations
+          python3 saas_educativo_angola_artifacts/tools/build_migrations.py --check
       - name: OpenAPI válido
         run: npx --yes @redocly/cli@latest lint saas_educativo_angola_artifacts/api/openapi.yaml --max-problems 1000 --format=stylish | tee /tmp/lint.txt; ! grep -q " error " /tmp/lint.txt
 

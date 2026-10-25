@@ -4,6 +4,8 @@ import { Layout } from './app/Layout'
 import { ApplicationsPage } from './modules/admin/ApplicationsPage'
 import { AuthProvider, useAuth } from './modules/auth/AuthProvider'
 import { LoginPage } from './modules/auth/LoginPage'
+import { ChargesPage } from './modules/finance/ChargesPage'
+import { PaymentsPage } from './modules/finance/PaymentsPage'
 import { GradesPage } from './modules/grades/GradesPage'
 import { SheetPage } from './modules/grades/SheetPage'
 import { DashboardPage } from './modules/school/DashboardPage'
@@ -30,6 +32,8 @@ function Routing() {
         <Route path="/matriculas" element={<EnrollmentsPage />} />
         <Route path="/notas" element={<GradesPage />} />
         <Route path="/pautas" element={<SheetPage />} />
+        <Route path="/pagamentos" element={<PaymentsPage />} />
+        <Route path="/cobrancas" element={<ChargesPage />} />
         {me.is_platform_admin && <Route path="/admin/adesoes" element={<ApplicationsPage />} />}
         <Route path="*" element={<Navigate to={home} replace />} />
       </Route>

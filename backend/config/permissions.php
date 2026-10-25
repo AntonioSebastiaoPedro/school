@@ -20,6 +20,10 @@ return [
         'grades.lock',
         'results.close',
         'documents.issue',
+        'finance.view',
+        'finance.manage',
+        'finance.pay',
+        'finance.reverse',
     ],
 
     'roles' => [
@@ -31,8 +35,8 @@ return [
             'grades.view', 'documents.issue',
         ],
         'teacher' => ['students.view', 'grades.view', 'grades.write'],
-        'finance' => ['students.view'],
-        'cashier' => ['students.view'],
+        'finance' => ['students.view', 'finance.view', 'finance.manage', 'finance.pay', 'finance.reverse'],
+        'cashier' => ['students.view', 'finance.view', 'finance.pay'],
         'trainer' => ['students.view'],
     ],
 ];

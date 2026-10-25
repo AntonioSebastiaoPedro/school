@@ -81,3 +81,12 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error('useAuth fora do AuthProvider')
   return ctx
 }
+
+/** Papel do utilizador na instituição activa. Só serve para mostrar ou esconder opções: o servidor decide. */
+export function useRole(): string | null {
+  const { me, institutionId } = useAuth()
+  return me?.institutions.find((i) => String(i.institution_id) === institutionId)?.role ?? null
+}
+
+export const FINANCE_ROLES = ['owner', 'director', 'finance', 'cashier']
+export const REVERSE_ROLES = ['owner', 'director', 'finance']

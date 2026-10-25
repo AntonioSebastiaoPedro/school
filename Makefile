@@ -65,8 +65,7 @@ format: ## Formata o PHP com o Pint
 migrations: ## Regenera as migrations a partir do schema.sql
 	python3 $(ART)/tools/build_migrations.py
 schema-check: ## Falha se as migrations não estiverem em dia com o schema.sql
-	python3 $(ART)/tools/build_migrations.py
-	git diff --exit-code backend/database/migrations
+	python3 $(ART)/tools/build_migrations.py --check
 openapi-lint: ## Valida o OpenAPI
 	npx --yes @redocly/cli@latest lint $(ART)/api/openapi.yaml --max-problems 1000 --format=stylish | tee /tmp/openapi-lint.txt; ! grep -q " error " /tmp/openapi-lint.txt
 

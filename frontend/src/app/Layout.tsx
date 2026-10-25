@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icon, type IconName } from '../components/Icon'
-import { useAuth } from '../modules/auth/AuthProvider'
+import { FINANCE_ROLES, useAuth } from '../modules/auth/AuthProvider'
 
 const ACADEMIC: { to: string; label: string; icon: IconName }[] = [
   { to: '/alunos', label: 'Alunos e encarregados', icon: 'people' },
@@ -10,6 +10,11 @@ const ACADEMIC: { to: string; label: string; icon: IconName }[] = [
   { to: '/pautas', label: 'Pautas', icon: 'sheet' },
 ]
 
+const FINANCE: { to: string; label: string; icon: IconName }[] = [
+  { to: '/pagamentos', label: 'Pagamentos e recibos', icon: 'card' },
+  { to: '/cobrancas', label: 'Cobranças e dívidas', icon: 'receipt' },
+]
+
 const TITLES: Record<string, string> = {
   '/': 'Painel',
   '/alunos': 'Alunos e encarregados',
@@ -17,6 +22,8 @@ const TITLES: Record<string, string> = {
   '/estrutura': 'Anos e turmas',
   '/notas': 'Lançamento de notas',
   '/pautas': 'Pautas',
+  '/pagamentos': 'Pagamentos e recibos',
+  '/cobrancas': 'Cobranças e dívidas',
   '/admin/adesoes': 'Pedidos de adesão',
 }
 
@@ -42,6 +49,7 @@ export function Layout() {
   const institutions = me.institutions
   const admin = pathname.startsWith('/admin')
   const current = institutions.find((i) => String(i.institution_id) === institutionId)
+  const canFinance = !!current && FINANCE_ROLES.includes(current.role)
   const roleLabel = admin ? 'Administrador SaaS' : current ? (ROLES[current.role] ?? current.role) : ''
 
   return (
@@ -88,6 +96,17 @@ export function Layout() {
                   {item.label}
                 </NavLink>
               ))}
+              {canFinance && (
+                <>
+                  <div className="nav-group">Financeiro</div>
+                  {FINANCE.map((item) => (
+                    <NavLink key={item.to} to={item.to}>
+                      <Icon name={item.icon} />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </>
+              )}
             </>
           )}
           {me.is_platform_admin && (

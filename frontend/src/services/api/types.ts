@@ -137,3 +137,51 @@ export const INSTITUTION_TYPES: Record<Application['institution_type'], string> 
 }
 
 export const REGIMES: Record<string, string> = { public: 'Público', private: 'Privado', mixed: 'Misto' }
+
+export interface Charge {
+  id: number
+  student_id: number
+  student_name: string
+  student_number: string
+  enrollment_id: number
+  code: string
+  description: string
+  category: string
+  status: 'draft' | 'open' | 'partially_paid' | 'paid' | 'void' | 'written_off'
+  amount: string
+  paid: string
+  outstanding: string
+  due_date: string | null
+  overdue: boolean
+}
+
+export interface Payment {
+  id: number
+  student_id: number
+  payment_code: string
+  amount: string
+  method: PaymentMethod
+  status: 'confirmed' | 'reversed'
+  reference: string | null
+  paid_at: string
+  receipt?: { id: number; receipt_code: string; status: 'issued' | 'void' } | null
+}
+
+export type PaymentMethod = 'cash' | 'card_terminal' | 'bank_transfer' | 'deposit' | 'other_manual'
+
+export const METHODS: Record<PaymentMethod, string> = {
+  card_terminal: 'Multicaixa (TPA)',
+  cash: 'Numerário',
+  bank_transfer: 'Transferência bancária',
+  deposit: 'Depósito',
+  other_manual: 'Outro (manual)',
+}
+
+export interface FinanceSummary {
+  issued: string
+  received: string
+  reversed: string
+  pending: string
+  overdue: string
+  students_overdue: number
+}

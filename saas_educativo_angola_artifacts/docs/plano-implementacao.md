@@ -30,8 +30,9 @@ Regras do ensino angolano: `docs/regras-ensino.md`. Modelo: `database/schema.sql
 - Recálculo de `grade_averages`; pautas trimestral, final e de recurso (JSON); fecho e abertura de pautas.
 - Fecho do ano por turma com `enrollment_results` e `historical_grades`; resultado igual ao da pauta.
 
-## Sprint 4 — Financeiro (fora do âmbito desta entrega)
-- Cobranças, pagamentos, alocações, idempotência, recibos, estornos, caixa.
+## Sprint 4 — Financeiro (feito, excepto caixa)
+- Cobranças (individuais e por turma), pagamentos manuais com alocação total, idempotência com fila por chave, recibos numerados, estornos autorizados e resumo financeiro.
+- Por fazer: sessão de caixa e reconciliação (`cash_registers`), descontos e isenções, mora, PDF do recibo.
 
 ## Sprint 5 — Presenças, portal, documentos
 - Presenças (escola e formação), portal de encarregados, certificados de formação.

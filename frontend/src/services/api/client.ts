@@ -52,11 +52,11 @@ export async function ensureCsrfCookie(): Promise<void> {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-export async function api<T>(method: Method, path: string, body?: unknown): Promise<T> {
+export async function api<T>(method: Method, path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
   if (method !== 'GET' && !xsrfToken()) await ensureCsrfCookie()
 
   const token = xsrfToken()
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers['X-XSRF-TOKEN'] = token
   if (institutionId) headers['X-Institution-Id'] = institutionId

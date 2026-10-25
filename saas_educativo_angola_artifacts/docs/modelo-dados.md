@@ -58,10 +58,10 @@
 - `courses`, `course_editions`, `training_enrollments`: inalterados.
 
 ### Financeiro e documentos
-- `charges`: obrigação/cobrança emitida.
-- `payments`: recebimento registado e confirmado segundo a política da instituição.
+- `charges`: obrigação/cobrança emitida. O valor em dívida nunca é guardado: calcula-se como `amount` menos as alocações de pagamentos **confirmados** (um estorno reabre a dívida sem editar a cobrança).
+- `payments`: recebimento manual confirmado. `idempotency_key` + `request_hash` impedem duplicação (mesma chave e pedido devolve o original; pedido diferente é conflito). Métodos: `cash`, `card_terminal` (Multicaixa/TPA), `bank_transfer`, `deposit`, `other_manual`. Estornado fica registado (`reversed_at`, `reversal_reason` obrigatórios), nunca apagado.
 - `payment_allocations`: distribuição de um pagamento por uma ou mais cobranças.
-- `receipts`: documento emitido para um pagamento.
+- `receipts`: documento emitido para um pagamento (`RC AAAA/NNNNN`, numeração em `document_sequences`); o estorno anula-o com motivo.
 - `cash_registers`: sessão de caixa.
 - `certificates`: certificados de conclusão de formação.
 - `document_sequences` e `issued_documents`: numeração, livro e folha dos documentos oficiais escolares (declaração, certificado, termo, atestado).

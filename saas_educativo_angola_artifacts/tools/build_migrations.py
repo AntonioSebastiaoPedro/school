@@ -3,10 +3,12 @@
 
 schema.sql é a única fonte de verdade do esquema. Cada módulo abaixo corta o
 ficheiro entre dois marcadores e produz uma migration que executa esse SQL.
-Uso: python3 tools/build_migrations.py
+Uso: python3 tools/build_migrations.py          (gera)
+     python3 tools/build_migrations.py --check  (falha se as migrations não estiverem em dia)
 """
-import re
 import pathlib
+import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMA = (ROOT / "database" / "schema.sql").read_text(encoding="utf-8")
@@ -44,9 +46,7 @@ for name, marker in MODULES:
     slices.append((name, body[pos:end].strip()))
     pos = end
 
-for old in OUT.glob("2026_10_25_*_create_*_tables.php"):
-    old.unlink()
-OUT.mkdir(parents=True, exist_ok=True)
+generated: dict[pathlib.Path, str] = {}
 
 for n, (name, sql) in enumerate(slices, start=1):
     tables = re.findall(r"CREATE TABLE (\w+)", sql)
@@ -75,5 +75,23 @@ SQL);
     }}
 }};
 """
-    (OUT / f"2026_10_25_{n:06d}_create_{name}_tables.php").write_text(php, encoding="utf-8")
-    print(f"{n:02d} {name}: {len(tables)} tabelas")
+    generated[OUT / f"2026_10_25_{n:06d}_create_{name}_tables.php"] = php
+
+existing = {p: p.read_text(encoding="utf-8") for p in OUT.glob("2026_10_25_*_create_*_tables.php")}
+
+if "--check" in sys.argv:
+    stale = sorted(p.name for p in existing.keys() | generated.keys() if existing.get(p) != generated.get(p))
+    if stale:
+        print("Migrations fora de sincronia com schema.sql: " + ", ".join(stale), file=sys.stderr)
+        print("Corra: make migrations", file=sys.stderr)
+        sys.exit(1)
+    print("Migrations em dia com o schema.sql.")
+    sys.exit(0)
+
+for old in existing:
+    old.unlink()
+OUT.mkdir(parents=True, exist_ok=True)
+
+for path, php in generated.items():
+    path.write_text(php, encoding="utf-8")
+    print(f"{path.name}: {len(re.findall('CREATE TABLE', php))} tabelas")

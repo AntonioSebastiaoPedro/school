@@ -10,9 +10,9 @@ Laravel 13 (API) + React/TypeScript (Vite) + PostgreSQL.
 
 ## Estado
 
-Implementado: fundação, identidade e tenant (sessão Sanctum, `X-Institution-Id` validado contra a associação), adesão e aprovação de instituições, planos e subscrições, perfil escolar, currículo oficial, alunos e encarregados, anos/salas/turmas, matrículas (idade, capacidade, renovação em massa, transferência), notas, pautas (trimestral, final e de recurso em JSON), fecho do ano.
+Implementado: financeiro (cobranças por turma, pagamentos manuais com alocação, idempotência, recibos numerados, estornos e resumo emitido/recebido/pendente), fundação, identidade e tenant (sessão Sanctum, `X-Institution-Id` validado contra a associação), adesão e aprovação de instituições, planos e subscrições, perfil escolar, currículo oficial, alunos e encarregados, anos/salas/turmas, matrículas (idade, capacidade, renovação em massa, transferência), notas, pautas (trimestral, final e de recurso em JSON), fecho do ano.
 
-Fora desta entrega: financeiro, portal dos encarregados, certificados de formação, PDF dos documentos oficiais (declaração, certificado, termo, atestado, pauta A3), piloto. Os municípios de Angola não vêm carregados: preencher `backend/database/seeders/data/municipalities.csv` com a divisão oficial (colunas `province,municipality`).
+Fora desta entrega: sessão de caixa, portal dos encarregados, certificados de formação, PDF dos documentos oficiais (declaração, certificado, termo, atestado, pauta A3), piloto. Os municípios de Angola não vêm carregados: preencher `backend/database/seeders/data/municipalities.csv` com a divisão oficial (colunas `province,municipality`).
 
 ## Makefile
 

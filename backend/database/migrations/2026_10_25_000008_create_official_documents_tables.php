@@ -18,7 +18,7 @@ return new class extends Migration
 
 CREATE TABLE document_sequences (
     institution_id BIGINT NOT NULL REFERENCES institutions(id) ON DELETE RESTRICT,
-    document_type VARCHAR(20) NOT NULL CHECK (document_type IN ('declaration','certificate','term','attestation')),
+    document_type VARCHAR(20) NOT NULL CHECK (document_type IN ('declaration','certificate','term','attestation','receipt','payment','charge')),
     year SMALLINT NOT NULL,
     last_number INTEGER NOT NULL DEFAULT 0 CHECK (last_number >= 0),
     PRIMARY KEY (institution_id, document_type, year)

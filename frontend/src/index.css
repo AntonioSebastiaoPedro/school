@@ -187,6 +187,16 @@ caption { text-align: left; padding: 14px 20px; color: var(--muted); font-size: 
 .login { max-width: 380px; margin: 10vh auto; padding: 0 16px; display: flex; flex-direction: column; gap: 20px; }
 .login form { display: flex; flex-direction: column; gap: 14px; }
 
+/* Recibo */
+.receipt { gap: 14px; padding: 24px; }
+.receipt .row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.receipt .total { font-weight: 700; font-size: 16px; padding-top: 8px; border-top: 1px solid var(--line); }
+.receipt hr { border: 0; border-top: 1px dashed var(--line-strong); margin: 0; width: 100%; }
+.right { text-align: right; }
+.checkbox { width: 18px; height: 18px; accent-color: var(--accent); }
+.amount-input { width: 120px; text-align: right; height: 40px; }
+button.xl { height: 48px; font-size: 15px; font-weight: 700; }
+
 @media (max-width: 640px) {
   .topbar, .content { padding-left: 16px; padding-right: 16px; }
   .stats.compact { grid-template-columns: 1fr; }

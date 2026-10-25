@@ -1021,40 +1021,86 @@ paths:
   /charges:
     get:
       tags: [Finance]
-      summary: Listar cobranças
+      summary: Listar cobranças com o valor pago e em dívida
+      description: "Valores monetários são texto decimal com 2 casas. `outstanding` desconta só pagamentos confirmados."
       parameters:
         - in: query
           name: student_id
           schema: { type: integer }
         - in: query
           name: status
-          schema: { type: string, enum: [draft, open, partially_paid, paid, void, written_off] }
+          description: Um ou vários estados separados por vírgula
+          schema: { type: string, example: "open,partially_paid" }
         - in: query
           name: due_before
           schema: { type: string, format: date }
       responses:
-        "200": { description: Lista paginada de cobranças }
+        "200":
+          description: Lista paginada de cobranças
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Charge" } }
+                  meta: { type: object }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
       tags: [Finance]
-      summary: Criar cobrança
+      summary: Criar cobrança para uma matrícula
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [student_id, code, description, category, amount]
+              required: [enrollment_id, description, category, amount]
               properties:
-                student_id: { type: integer }
-                enrollment_id: { type: [integer, "null"] }
-                training_enrollment_id: { type: [integer, "null"] }
-                code: { type: string, maxLength: 80 }
+                enrollment_id: { type: integer }
                 description: { type: string, maxLength: 240 }
-                category: { type: string, maxLength: 60 }
-                amount: { type: number, exclusiveMinimum: 0 }
+                category: { type: string, maxLength: 60, example: tuition }
+                amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$", example: "45000.00" }
                 due_date: { type: [string, "null"], format: date }
       responses:
-        "201": { description: Cobrança criada }
+        "201": { description: "Cobrança criada em estado aberto, com código CB-AAAA-NNNNNN" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /charges/bulk:
+    post:
+      tags: [Finance]
+      summary: Gerar a mesma cobrança para todos os alunos activos de uma turma
+      description: "Não repete uma cobrança já existente (mesma matrícula, categoria e descrição)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section_id, description, category, amount]
+              properties:
+                section_id: { type: integer }
+                description: { type: string }
+                category: { type: string }
+                amount: { type: string, example: "45000.00" }
+                due_date: { type: [string, "null"], format: date }
+      responses:
+        "201":
+          description: Resumo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                  skipped: { type: integer }
+  /charges/{id}/void:
+    post:
+      tags: [Finance]
+      summary: Anular cobrança sem pagamentos confirmados
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Cobrança anulada }
+        "409": { description: Já anulada ou com pagamentos confirmados (estorne-os primeiro) }
   /payments:
     get:
       tags: [Finance]
@@ -1064,16 +1110,26 @@ paths:
           name: student_id
           schema: { type: integer }
         - in: query
+          name: status
+          schema: { type: string, enum: [confirmed, reversed] }
+        - in: query
           name: from
           schema: { type: string, format: date }
         - in: query
           name: to
           schema: { type: string, format: date }
       responses:
-        "200": { description: Lista paginada de pagamentos }
+        "200": { description: "Lista paginada de pagamentos, com o código do recibo" }
     post:
       tags: [Finance]
-      summary: Registar pagamento manual e alocações
+      summary: Registar pagamento manual, alocá-lo às cobranças e emitir o recibo
+      description: >
+        Numa só transacção. O valor recebido tem de ser totalmente alocado, cada alocação não pode
+        exceder o saldo da cobrança, e as cobranças têm de ser do aluno e estar em aberto.
+        `Idempotency-Key` é obrigatório: repetir o mesmo pedido com a mesma chave devolve o pagamento
+        original (200, `replayed: true`) sem duplicar; a mesma chave com um pedido diferente dá 409.
+        Pedidos simultâneos com a mesma chave ficam em fila. O código do pagamento e o do recibo
+        (RC AAAA/NNNNN) são atribuídos pelo sistema.
       parameters:
         - in: header
           name: Idempotency-Key
@@ -1085,14 +1141,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [student_id, payment_code, amount, method, allocations]
+              required: [student_id, amount, method, allocations]
               properties:
                 student_id: { type: integer }
-                payment_code: { type: string, maxLength: 80 }
-                amount: { type: number, exclusiveMinimum: 0 }
-                method: { type: string, enum: [cash, bank_transfer, other_manual] }
+                amount: { type: string, example: "70000.00" }
+                method: { type: string, enum: [cash, card_terminal, bank_transfer, deposit, other_manual] }
                 reference: { type: [string, "null"], maxLength: 120 }
-                paid_at: { type: string, format: date-time }
+                paid_at: { type: [string, "null"], format: date-time, description: "Não pode ser futura" }
                 notes: { type: [string, "null"] }
                 allocations:
                   type: array
@@ -1102,15 +1157,27 @@ paths:
                     required: [charge_id, amount]
                     properties:
                       charge_id: { type: integer }
-                      amount: { type: number, exclusiveMinimum: 0 }
+                      amount: { type: string, example: "45000.00" }
       responses:
         "201": { description: Pagamento confirmado e recibo emitido }
-        "409": { description: Chave de idempotência repetida com payload incompatível ou saldo inválido }
+        "200": { description: Repetição da mesma chave e do mesmo pedido; devolve o pagamento original }
+        "409": { description: Chave de idempotência usada com um pedido diferente }
         "422": { $ref: "#/components/responses/ValidationError" }
+  /payments/{id}:
+    get:
+      tags: [Finance]
+      summary: Consultar pagamento com alocações e recibo
+      description: "Não existe DELETE: pagamentos confirmados corrigem-se por estorno (RN-031)."
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Pagamento }
+        "404": { description: Não encontrado na instituição activa }
   /payments/{id}/reverse:
     post:
       tags: [Finance]
-      summary: Estornar pagamento com auditoria
+      summary: Estornar pagamento (autorizado, com motivo)
+      description: "O pagamento fica registado como estornado, o recibo é anulado e as cobranças reabrem. Só `owner`, `director` e `finance`."
       parameters:
         - $ref: "#/components/parameters/Id"
       requestBody:
@@ -1124,16 +1191,17 @@ paths:
                 reason: { type: string, minLength: 5, maxLength: 1000 }
       responses:
         "200": { description: Pagamento estornado e saldos recalculados }
-        "409": { description: Pagamento já estornado ou estado incompatível }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { description: Pagamento já estornado }
   /receipts/{id}:
     get:
       tags: [Finance]
-      summary: Consultar recibo autorizado
+      summary: Dados do recibo (escola, aluno, pagador, itens, operador)
       parameters:
         - $ref: "#/components/parameters/Id"
       responses:
-        "200": { description: Dados do recibo/documento }
-        "404": { description: Não encontrado no tenant activo }
+        "200": { description: Recibo }
+        "404": { description: Não encontrado na instituição activa }
   /training-enrollments/{id}/certificate:
     post:
       tags: [Certificates]
@@ -1171,7 +1239,8 @@ paths:
   /reports/finance/summary:
     get:
       tags: [Reports]
-      summary: Resumo financeiro da instituição
+      summary: Resumo financeiro que distingue emitido, recebido, estornado, pendente e vencido
+      description: "Emitido, recebido e estornado respeitam o período; pendente e vencido são o retrato de hoje."
       parameters:
         - in: query
           name: from
@@ -1182,7 +1251,22 @@ paths:
           required: true
           schema: { type: string, format: date }
       responses:
-        "200": { description: "Totais de cobranças, recebimentos, dívida e estornos" }
+        "200":
+          description: Totais
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      issued: { type: string }
+                      received: { type: string }
+                      reversed: { type: string }
+                      pending: { type: string }
+                      overdue: { type: string }
+                      students_overdue: { type: integer }
 components:
   securitySchemes:
     cookieAuth:
@@ -1226,6 +1310,23 @@ components:
               feature_key: { type: string, description: "Ex.: max_active_students" }
               enabled: { type: [boolean, "null"] }
               numeric_limit: { type: [integer, "null"], minimum: 0 }
+    Charge:
+      type: object
+      properties:
+        id: { type: integer }
+        student_id: { type: integer }
+        student_name: { type: string }
+        student_number: { type: string }
+        enrollment_id: { type: integer }
+        code: { type: string, example: CB-2026-000001 }
+        description: { type: string }
+        category: { type: string }
+        status: { type: string, enum: [draft, open, partially_paid, paid, void, written_off] }
+        amount: { type: string }
+        paid: { type: string }
+        outstanding: { type: string }
+        due_date: { type: [string, "null"], format: date }
+        overdue: { type: boolean }
     InstitutionMembership:
       type: object
       properties:

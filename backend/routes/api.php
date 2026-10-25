@@ -1,5 +1,9 @@
 <?php
 
+use App\Modules\Finance\Http\ChargeController;
+use App\Modules\Finance\Http\FinanceReportController;
+use App\Modules\Finance\Http\PaymentController;
+use App\Modules\Finance\Http\ReceiptController;
 use App\Modules\Identity\Http\AuthController;
 use App\Modules\Platform\Http\AdminApplicationController;
 use App\Modules\Platform\Http\ApplicationController;
@@ -82,6 +86,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/guardians', [GuardianController::class, 'index'])->middleware('can:students.view');
         Route::post('/guardians', [GuardianController::class, 'store'])->middleware('can:guardians.manage');
         Route::post('/students/{id}/guardians', [GuardianController::class, 'attach'])->middleware('can:guardians.manage');
+
+        // Financeiro
+        Route::middleware('can:finance.view')->group(function () {
+            Route::get('/charges', [ChargeController::class, 'index']);
+            Route::get('/payments', [PaymentController::class, 'index']);
+            Route::get('/payments/{id}', [PaymentController::class, 'show']);
+            Route::get('/receipts/{id}', [ReceiptController::class, 'show']);
+            Route::get('/reports/finance/summary', [FinanceReportController::class, 'summary']);
+        });
+        Route::middleware('can:finance.manage')->group(function () {
+            Route::post('/charges', [ChargeController::class, 'store']);
+            Route::post('/charges/bulk', [ChargeController::class, 'bulk']);
+            Route::post('/charges/{id}/void', [ChargeController::class, 'void']);
+        });
+        Route::post('/payments', [PaymentController::class, 'store'])->middleware('can:finance.pay');
+        Route::post('/payments/{id}/reverse', [PaymentController::class, 'reverse'])->middleware('can:finance.reverse');
 
         // Matrículas
         Route::get('/enrollments', [EnrollmentController::class, 'index'])->middleware('can:students.view');

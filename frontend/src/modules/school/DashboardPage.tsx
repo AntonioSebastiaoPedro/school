@@ -3,9 +3,21 @@ import { Link } from 'react-router-dom'
 import { ErrorBanner, Meter, Notice, PageHead, Stat } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { api } from '../../services/api/client'
-import type { Enrollment, GradeLevel, Paginated, SchoolYear, Section, Student } from '../../services/api/types'
+import type { Enrollment, FinanceSummary, GradeLevel, Paginated, SchoolYear, Section, Student } from '../../services/api/types'
+import { FINANCE_ROLES, useRole } from '../auth/AuthProvider'
+import { formatKz, fromApi } from '../finance/money'
 
 export function DashboardPage() {
+  const role = useRole()
+  const canFinance = role !== null && FINANCE_ROLES.includes(role)
+  const monthStart = new Date().toISOString().slice(0, 8) + '01'
+  const today = new Date().toISOString().slice(0, 10)
+  const finance = useQuery({
+    queryKey: ['finance-summary', monthStart, today],
+    enabled: canFinance,
+    queryFn: () => api<{ data: FinanceSummary }>('GET', `/reports/finance/summary?from=${monthStart}&to=${today}`),
+  })
+  const kz = (v?: string) => (v === undefined ? '—' : `${formatKz(fromApi(v))} Kz`)
   const students = useQuery({ queryKey: ['students-count'], queryFn: () => api<Paginated<Student>>('GET', '/students?status=active') })
   const pending = useQuery({ queryKey: ['pending-enrollments'], queryFn: () => api<Paginated<Enrollment>>('GET', '/enrollments?status=pending') })
   const sections = useQuery({ queryKey: ['sections'], queryFn: () => api<{ data: Section[] }>('GET', '/sections') })
@@ -42,6 +54,17 @@ export function DashboardPage() {
           tone="warn"
         />
         <Stat label="Turmas" value={yearSections.length} hint={`${enrolled} de ${capacity} lugares ocupados`} />
+        {canFinance && (
+          <>
+            <Stat label="Recebido este mês" value={kz(finance.data?.data.received)} hint={finance.data ? `Emitido: ${kz(finance.data.data.issued)}` : undefined} />
+            <Stat
+              label="Em dívida"
+              value={kz(finance.data?.data.pending)}
+              hint={finance.data && finance.data.data.students_overdue > 0 ? `${finance.data.data.students_overdue} alunos com cobranças vencidas` : undefined}
+              tone="bad"
+            />
+          </>
+        )}
         <Stat label="Turmas quase lotadas" value={nearFull.length} hint={nearFull.length > 0 ? 'Acima de 90% da capacidade' : undefined} tone="warn" />
       </section>
 
