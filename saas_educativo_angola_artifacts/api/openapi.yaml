@@ -1,0 +1,673 @@
+openapi: 3.1.0
+info:
+  title: SaaS Educativo Angola API
+  version: 0.1.0
+  description: Contrato REST inicial. Os endpoints e esquemas devem evoluir com os requisitos validados.
+servers:
+  - url: https://api.example.ao/api/v1
+    description: Exemplo; substituir pelo domínio real
+tags:
+  - name: Auth
+  - name: Applications
+  - name: Institutions
+  - name: Subscriptions
+  - name: Students
+  - name: Guardians
+  - name: Enrollments
+  - name: Courses
+  - name: Training
+  - name: Finance
+  - name: Certificates
+  - name: Reports
+security:
+  - cookieAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Iniciar sessão
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "204": { description: Sessão iniciada; implementação por cookie seguro }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "401": { description: Credenciais inválidas }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Terminar sessão
+      responses:
+        "204": { description: Sessão terminada }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Obter utilizador autenticado e instituições disponíveis
+      responses:
+        "200":
+          description: Perfil e associações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      email: { type: string, format: email }
+                      institutions:
+                        type: array
+                        items: { $ref: "#/components/schemas/InstitutionMembership" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /institution-applications:
+    post:
+      tags: [Applications]
+      security: []
+      summary: Submeter pedido público de adesão
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [institution_type, proposed_name, applicant_name, applicant_email, applicant_phone]
+              properties:
+                institution_type: { type: string, enum: [school, training_center, both] }
+                proposed_name: { type: string, maxLength: 180 }
+                applicant_name: { type: string, maxLength: 180 }
+                applicant_email: { type: string, format: email }
+                applicant_phone: { type: string, maxLength: 40 }
+                tax_identifier: { type: [string, "null"] }
+                province: { type: [string, "null"] }
+                municipality: { type: [string, "null"] }
+      responses:
+        "201": { description: Pedido criado e pendente de análise }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/institution-applications:
+    get:
+      tags: [Applications]
+      summary: Listar pedidos de adesão (admin SaaS)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, under_review, approved, rejected, info_requested] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/PaginatedApplications" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /admin/institution-applications/{id}/decision:
+    post:
+      tags: [Applications]
+      summary: Aprovar, rejeitar ou solicitar informação
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, reject, request_info] }
+                notes: { type: [string, "null"], maxLength: 4000 }
+      responses:
+        "200": { description: Decisão registada }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { description: Estado incompatível com a decisão }
+  /institution:
+    get:
+      tags: [Institutions]
+      summary: Consultar instituição activa
+      responses:
+        "200":
+          description: Instituição activa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Institution" }
+    patch:
+      tags: [Institutions]
+      summary: Actualizar configuração institucional
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 180 }
+                email: { type: [string, "null"], format: email }
+                phone: { type: [string, "null"] }
+                address: { type: [string, "null"] }
+                municipality: { type: [string, "null"] }
+                province: { type: [string, "null"] }
+      responses:
+        "200": { description: Instituição actualizada }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /students:
+    get:
+      tags: [Students]
+      summary: Listar alunos/formandos da instituição activa
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, inactive, archived] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/PaginatedStudents" }
+    post:
+      tags: [Students]
+      summary: Criar perfil de aluno/formando
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInput"
+      responses:
+        "201":
+          description: Perfil criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Student" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /students/{id}:
+    get:
+      tags: [Students]
+      summary: Consultar perfil
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Perfil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Student" }
+        "404": { description: Não encontrado no tenant activo }
+    patch:
+      tags: [Students]
+      summary: Actualizar perfil
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudentInput" }
+      responses:
+        "200": { description: Perfil actualizado }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /guardians:
+    get:
+      tags: [Guardians]
+      summary: Listar encarregados
+      responses:
+        "200": { description: Lista paginada de encarregados }
+    post:
+      tags: [Guardians]
+      summary: Criar encarregado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardianInput" }
+      responses:
+        "201": { description: Encarregado criado }
+  /students/{id}/guardians:
+    post:
+      tags: [Guardians]
+      summary: Associar encarregado ao aluno
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guardian_id]
+              properties:
+                guardian_id: { type: integer }
+                relationship_label: { type: [string, "null"] }
+                is_primary: { type: boolean, default: false }
+                can_view_finance: { type: boolean, default: false }
+                can_view_academic: { type: boolean, default: true }
+      responses:
+        "201": { description: Associação criada; validar tenant e autorização }
+        "409": { description: Associação já existe }
+  /school-years:
+    get:
+      tags: [Enrollments]
+      summary: Listar anos lectivos
+      responses:
+        "200": { description: Lista de anos lectivos }
+    post:
+      tags: [Enrollments]
+      summary: Criar ano lectivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, starts_on, ends_on]
+              properties:
+                name: { type: string, maxLength: 80 }
+                starts_on: { type: string, format: date }
+                ends_on: { type: string, format: date }
+      responses:
+        "201": { description: Ano lectivo criado }
+  /enrollments:
+    get:
+      tags: [Enrollments]
+      summary: Listar matrículas escolares
+      parameters:
+        - in: query
+          name: school_year_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200": { description: Lista paginada de matrículas }
+    post:
+      tags: [Enrollments]
+      summary: Criar matrícula
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, school_year_id, school_class_id, enrollment_code]
+              properties:
+                student_id: { type: integer }
+                school_year_id: { type: integer }
+                school_class_id: { type: integer }
+                classroom_id: { type: [integer, "null"] }
+                enrollment_code: { type: string, maxLength: 80 }
+      responses:
+        "201": { description: Matrícula criada em estado pendente }
+        "409": { description: Matrícula duplicada ou capacidade excedida }
+  /enrollments/{id}/decision:
+    post:
+      tags: [Enrollments]
+      summary: Aprovar ou cancelar matrícula
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, cancel, transfer, complete] }
+                reason: { type: [string, "null"] }
+      responses:
+        "200": { description: Estado actualizado }
+        "409": { description: Transição de estado inválida }
+  /courses:
+    get:
+      tags: [Courses]
+      summary: Listar cursos
+      responses:
+        "200": { description: Lista paginada de cursos }
+    post:
+      tags: [Courses]
+      summary: Criar curso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string, maxLength: 80 }
+                name: { type: string, maxLength: 180 }
+                description: { type: [string, "null"] }
+                duration_hours: { type: [integer, "null"], minimum: 1 }
+                default_price: { type: [number, "null"], minimum: 0 }
+      responses:
+        "201": { description: Curso criado }
+  /courses/{id}/editions:
+    post:
+      tags: [Courses]
+      summary: Criar edição de curso
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, price]
+              properties:
+                code: { type: string, maxLength: 80 }
+                starts_on: { type: [string, "null"], format: date }
+                ends_on: { type: [string, "null"], format: date }
+                capacity: { type: [integer, "null"], minimum: 1 }
+                price: { type: number, minimum: 0 }
+      responses:
+        "201": { description: Edição criada }
+  /course-editions/{id}/training-enrollments:
+    post:
+      tags: [Training]
+      summary: Inscrever formando numa edição
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, enrollment_code]
+              properties:
+                student_id: { type: integer }
+                enrollment_code: { type: string, maxLength: 80 }
+      responses:
+        "201": { description: Inscrição criada }
+        "409": { description: Duplicação ou capacidade excedida }
+  /charges:
+    get:
+      tags: [Finance]
+      summary: Listar cobranças
+      parameters:
+        - in: query
+          name: student_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [draft, open, partially_paid, paid, void, written_off] }
+        - in: query
+          name: due_before
+          schema: { type: string, format: date }
+      responses:
+        "200": { description: Lista paginada de cobranças }
+    post:
+      tags: [Finance]
+      summary: Criar cobrança
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, code, description, category, amount]
+              properties:
+                student_id: { type: integer }
+                enrollment_id: { type: [integer, "null"] }
+                training_enrollment_id: { type: [integer, "null"] }
+                code: { type: string, maxLength: 80 }
+                description: { type: string, maxLength: 240 }
+                category: { type: string, maxLength: 60 }
+                amount: { type: number, exclusiveMinimum: 0 }
+                due_date: { type: [string, "null"], format: date }
+      responses:
+        "201": { description: Cobrança criada }
+  /payments:
+    get:
+      tags: [Finance]
+      summary: Listar pagamentos
+      parameters:
+        - in: query
+          name: student_id
+          schema: { type: integer }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        "200": { description: Lista paginada de pagamentos }
+    post:
+      tags: [Finance]
+      summary: Registar pagamento manual e alocações
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, maxLength: 120 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, payment_code, amount, method, allocations]
+              properties:
+                student_id: { type: integer }
+                payment_code: { type: string, maxLength: 80 }
+                amount: { type: number, exclusiveMinimum: 0 }
+                method: { type: string, enum: [cash, bank_transfer, other_manual] }
+                reference: { type: [string, "null"], maxLength: 120 }
+                paid_at: { type: string, format: date-time }
+                notes: { type: [string, "null"] }
+                allocations:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [charge_id, amount]
+                    properties:
+                      charge_id: { type: integer }
+                      amount: { type: number, exclusiveMinimum: 0 }
+      responses:
+        "201": { description: Pagamento confirmado e recibo emitido }
+        "409": { description: Chave de idempotência repetida com payload incompatível ou saldo inválido }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /payments/{id}/reverse:
+    post:
+      tags: [Finance]
+      summary: Estornar pagamento com auditoria
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 1000 }
+      responses:
+        "200": { description: Pagamento estornado e saldos recalculados }
+        "409": { description: Pagamento já estornado ou estado incompatível }
+  /receipts/{id}:
+    get:
+      tags: [Finance]
+      summary: Consultar recibo autorizado
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Dados do recibo/documento }
+        "404": { description: Não encontrado no tenant activo }
+  /training-enrollments/{id}/certificate:
+    post:
+      tags: [Certificates]
+      summary: Emitir certificado para inscrição elegível
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "201": { description: Certificado emitido }
+        "409": { description: Inscrição não elegível ou certificado já emitido }
+  /certificates/verify/{verificationCode}:
+    get:
+      tags: [Certificates]
+      security: []
+      summary: Verificar autenticidade pública de certificado
+      parameters:
+        - in: path
+          name: verificationCode
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Resultado mínimo de verificação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+                  certificate_code: { type: [string, "null"] }
+                  institution_name: { type: [string, "null"] }
+                  course_name: { type: [string, "null"] }
+                  holder_name: { type: [string, "null"] }
+                  issued_at: { type: [string, "null"], format: date-time }
+        "404": { description: Código inexistente }
+  /reports/finance/summary:
+    get:
+      tags: [Reports]
+      summary: Resumo financeiro da instituição
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200": { description: Totais de cobranças, recebimentos, dívida e estornos }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: laravel_session
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, minimum: 1 }
+  schemas:
+    Institution:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        institution_type: { type: string, enum: [school, training_center, both] }
+        approval_status: { type: string }
+        operational_status: { type: string }
+        province: { type: [string, "null"] }
+        municipality: { type: [string, "null"] }
+    InstitutionMembership:
+      type: object
+      properties:
+        institution_id: { type: integer }
+        institution_name: { type: string }
+        role: { type: string }
+        status: { type: string }
+    StudentInput:
+      type: object
+      required: [student_code, first_name, last_name]
+      properties:
+        student_code: { type: string, maxLength: 80 }
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        preferred_name: { type: [string, "null"], maxLength: 100 }
+        birth_date: { type: [string, "null"], format: date }
+        gender: { type: [string, "null"], maxLength: 30 }
+        email: { type: [string, "null"], format: email }
+        phone: { type: [string, "null"], maxLength: 40 }
+        address: { type: [string, "null"] }
+    Student:
+      allOf:
+        - $ref: "#/components/schemas/StudentInput"
+        - type: object
+          properties:
+            id: { type: integer }
+            status: { type: string, enum: [active, inactive, archived] }
+            created_at: { type: string, format: date-time }
+    GuardianInput:
+      type: object
+      required: [first_name, last_name]
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        email: { type: [string, "null"], format: email }
+        phone: { type: [string, "null"], maxLength: 40 }
+        relationship_label: { type: [string, "null"], maxLength: 60 }
+  responses:
+    Unauthenticated:
+      description: Sessão inexistente ou expirada
+    Forbidden:
+      description: Utilizador autenticado sem permissão
+    ValidationError:
+      description: Dados inválidos
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: { type: string }
+    PaginatedApplications:
+      description: Lista paginada de pedidos
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { type: array, items: { type: object } }
+              meta:
+                type: object
+                properties:
+                  current_page: { type: integer }
+                  last_page: { type: integer }
+                  per_page: { type: integer }
+    PaginatedStudents:
+      description: Lista paginada de alunos
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { type: array, items: { $ref: "#/components/schemas/Student" } }
+              meta:
+                type: object
+                properties:
+                  current_page: { type: integer }
+                  last_page: { type: integer }
+                  per_page: { type: integer }
